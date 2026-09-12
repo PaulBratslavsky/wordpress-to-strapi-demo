@@ -1,0 +1,75 @@
+<!-- wp:paragraph -->
+<p>For years every site we launched ran on a classic WordPress theme. That worked well until clients started asking for the same content in an app, on an in-store screen and in a weekly newsletter. This post explains why most of our new builds now use a <strong>headless CMS</strong>, and what we learned moving the first three client sites.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:heading -->
+<h2 class="wp-block-heading">What "headless" means for a small business</h2>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>A headless CMS stores your content and serves it through an API. The website, the app and everything else are separate front ends that read from it. You edit a product description <em>once</em> and it updates everywhere.</p>
+<!-- /wp:paragraph -->
+
+{{embed:youtube:https://www.youtube.com/watch?v=BAAhEWbnOak|A short introduction to Strapi, the headless CMS we use on most projects.}}
+
+<!-- wp:heading -->
+<h2 class="wp-block-heading">The comparison that convinced our clients</h2>
+<!-- /wp:heading -->
+
+<!-- wp:table -->
+<figure class="wp-block-table"><table class="has-fixed-layout"><thead><tr><th></th><th>Classic theme</th><th>Headless CMS</th></tr></thead><tbody><tr><td>Page speed</td><td>Depends on plugins</td><td>Static pages, very fast</td></tr><tr><td>Reusing content</td><td>Copy and paste</td><td>One source, many channels</td></tr><tr><td>Editing</td><td>Page builder</td><td>Structured fields</td></tr><tr><td>Hosting</td><td>One server</td><td>CMS + front end</td></tr></tbody></table><figcaption class="wp-element-caption">How the two approaches compared across our last three launches.</figcaption></figure>
+<!-- /wp:table -->
+
+<!-- wp:heading {"level":3} -->
+<h3 class="wp-block-heading">Fetching content is a single request</h3>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>On the front end, loading every article with its cover image looks like this:</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:code -->
+<pre class="wp-block-code"><code>const res = await fetch('https://cms.example.com/api/articles?populate=cover');
+const { data } = await res.json();
+console.log(`${data.length} articles loaded`);</code></pre>
+<!-- /wp:code -->
+
+<!-- wp:heading {"level":3} -->
+<h3 class="wp-block-heading">What was harder than expected</h3>
+<!-- /wp:heading -->
+
+<!-- wp:list -->
+<ul class="wp-block-list"><!-- wp:list-item -->
+<li><strong>Previews.</strong> Editors expect to see a page before it goes live, so we set up draft previews on day one.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>Old URLs.</strong> Every migrated page needed a redirect from its old address.</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li><strong>Page-builder layouts.</strong> They don't move across automatically. We rebuilt them as reusable sections:<!-- wp:list -->
+<ul class="wp-block-list"><!-- wp:list-item -->
+<li>hero</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li>feature grid</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li>call to action</li>
+<!-- /wp:list-item --></ul>
+<!-- /wp:list --></li>
+<!-- /wp:list-item --></ul>
+<!-- /wp:list -->
+
+<!-- wp:quote -->
+<blockquote class="wp-block-quote"><!-- wp:paragraph -->
+<p>We stopped copying the same text into four different places. That alone paid for the project.</p>
+<!-- /wp:paragraph --><cite>Dana Whitfield, Voltline Solar</cite></blockquote>
+<!-- /wp:quote -->
+
+<!-- wp:paragraph -->
+<p>Want to see it in practice? Read how we built the {{link:portfolio_item:voltline-solar-dashboard|Voltline Solar dashboard}}, or find out more about our {{link:services:web-development|web development service}}.</p>
+<!-- /wp:paragraph -->

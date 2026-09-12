@@ -1,0 +1,86 @@
+<!-- wp:paragraph -->
+<p>Accessibility audits can feel overwhelming. These five fixes cover most of the problems we find on small business sites, and each one takes less than a day.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:heading -->
+<h2 class="wp-block-heading">1. Give every image a real description</h2>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>Screen readers read the <code>alt</code> attribute aloud. "IMG_4032.jpg" helps nobody. Describe what the image shows and why it's there. Decorative images should have an empty <code>alt=""</code> so they're skipped.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:heading -->
+<h2 class="wp-block-heading">2. Check your colour contrast</h2>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>Body text needs a contrast ratio of at least <strong>4.5:1</strong> against its background, and large headings at least <strong>3:1</strong>.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:table -->
+<figure class="wp-block-table"><table class="has-fixed-layout"><thead><tr><th>Text</th><th>Minimum ratio</th><th>Example that passes</th></tr></thead><tbody><tr><td>Body copy</td><td>4.5:1</td><td>#333333 on white</td></tr><tr><td>Large headings</td><td>3:1</td><td>#767676 on white</td></tr><tr><td>Buttons and icons</td><td>3:1</td><td>White on #1f4e5f</td></tr></tbody></table></figure>
+<!-- /wp:table -->
+
+<!-- wp:heading -->
+<h2 class="wp-block-heading">3. Make sure the keyboard works</h2>
+<!-- /wp:heading -->
+
+<!-- wp:list -->
+<ul class="wp-block-list"><!-- wp:list-item -->
+<li>Press <kbd>Tab</kbd> through the whole page. Can you reach every link and button?</li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li>Can you always see where the focus is?<!-- wp:list -->
+<ul class="wp-block-list"><!-- wp:list-item -->
+<li>If not, remove any <code>outline: none</code> without a replacement style.</li>
+<!-- /wp:list-item --></ul>
+<!-- /wp:list --></li>
+<!-- /wp:list-item -->
+
+<!-- wp:list-item -->
+<li>Can you close menus and pop-ups with <kbd>Esc</kbd>?</li>
+<!-- /wp:list-item --></ul>
+<!-- /wp:list -->
+
+<!-- wp:heading -->
+<h2 class="wp-block-heading">4. Label your form fields</h2>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>Placeholder text disappears as soon as someone types. Use a visible label connected to the field:</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:code -->
+<pre class="wp-block-code"><code>&lt;label for="email"&gt;Email address&lt;/label&gt;
+&lt;input id="email" type="email" autocomplete="email"&gt;</code></pre>
+<!-- /wp:code -->
+
+<!-- wp:heading -->
+<h2 class="wp-block-heading">5. Use headings in order</h2>
+<!-- /wp:heading -->
+
+<!-- wp:paragraph -->
+<p>One <code>h1</code> per page, then <code>h2</code> for sections and <code>h3</code> inside them. Many screen reader users jump between headings to find what they need, so skipping levels leaves gaps.</p>
+<!-- /wp:paragraph -->
+
+<!-- wp:heading -->
+<h2 class="wp-block-heading">Common questions</h2>
+<!-- /wp:heading -->
+
+<!-- wp:details -->
+<details class="wp-block-details"><summary>Do I need an accessibility plugin?</summary><!-- wp:paragraph -->
+<p>Usually not. Overlay plugins don't fix the underlying problems, and some make things worse. Fixing the markup is the reliable approach.</p>
+<!-- /wp:paragraph --></details>
+<!-- /wp:details -->
+
+<!-- wp:details -->
+<details class="wp-block-details"><summary>How often should we test?</summary><!-- wp:paragraph -->
+<p>Check new templates when they're built, and run a full review once a year.</p>
+<!-- /wp:paragraph --></details>
+<!-- /wp:details -->
+
+<!-- wp:paragraph -->
+<p>Need a hand? Accessibility reviews are part of our {{link:services:ux-product-design|UX and product design service}}.</p>
+<!-- /wp:paragraph -->

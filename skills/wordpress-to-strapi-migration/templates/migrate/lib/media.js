@@ -1,0 +1,172 @@
+import { readFile } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+import { htmlToText } from './util.js';
+
+/**
+ * WordPress media → Strapi media library.
+ *
+ * WordPress stores one attachment but serves it at many URLs: the original,
+ * a "-scaled" copy for big images (WP 5.3+), and every generated size
+ * ("photo-1024x683.jpg", "photo-300x200.jpg", ...). Post content references
+ * whichever size the editor picked. The original script handled this by
+ * stripping "-WxH" from URLs; here every known URL of every attachment is
+ * indexed up front, so any size resolves to its attachment and the original
+ * file is uploaded exactly once. The "-WxH" strip is kept as a fallback for
+ * sizes a theme generated later.
+ *
+ * Uploads are remembered in `.migration-state.json`, so re-runs reuse them.
+ */
+
+const SIZE_SUFFIX = /-\d+x\d+(?=\.[a-z0-9]+$)/i;
+const SCALED_SUFFIX = /-(scaled|rotated)(?=\.[a-z0-9]+$)/i;
+
+/** Host- and scheme-independent key for an uploads URL. */
+export function urlKey(url, base) {
+  try {
+    return decodeURIComponent(new URL(url, base).pathname).toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+const fileNameOf = (url) => {
+  try {
+    return decodeURIComponent(path.basename(new URL(url).pathname)) || 'file';
+  } catch {
+    return 'file';
+  }
+};
+
+export class MediaLibrary {
+  constructor({ items = [], strapi, state, siteUrl, strapiUrl, exportDir = '.', dryRun = false, uploadExternal = true, log = () => {} }) {
+    Object.assign(this, { strapi, state, siteUrl, strapiUrl, exportDir, dryRun, uploadExternal, log });
+    this.byId = new Map(items.map((m) => [m.id, m]));
+    this.byPath = new Map();
+    this.verified = new Set();
+    for (const m of items) {
+      const add = (u) => {
+        const k = u && urlKey(u, siteUrl);
+        if (k && !this.byPath.has(k)) this.byPath.set(k, m);
+      };
+      add(m.source_url);
+      for (const size of Object.values(m.media_details?.sizes ?? {})) add(size.source_url);
+      if (m.media_details?.original_image) add(m.source_url.replace(/[^/]+$/, m.media_details.original_image));
+    }
+  }
+
+  /** The attachment an uploads URL belongs to, whatever size it points at. */
+  find(url) {
+    const k = urlKey(url, this.siteUrl);
+    if (!k) return null;
+    const unsized = k.replace(SIZE_SUFFIX, '');
+    return (
+      this.byPath.get(k) ??
+      this.byPath.get(unsized) ??
+      this.byPath.get(unsized.replace(SCALED_SUFFIX, '')) ??
+      this.byPath.get(unsized.replace(/(\.[a-z0-9]+)$/, '-scaled$1')) ??
+      null
+    );
+  }
+
+  /** Absolute URL for a Strapi file (the local upload provider returns "/uploads/..."). */
+  publicUrl(file) {
+    return file.url?.startsWith('/') ? `${this.strapiUrl}${file.url}` : file.url;
+  }
+
+  /** Resolve any WordPress media reference — id, {id|ID|url} object, or URL — to a Strapi file. */
+  async ensure(ref) {
+    if (ref == null || ref === 0 || ref === '' || ref === false) return null;
+    if (typeof ref === 'number' || /^\d+$/.test(String(ref))) return this.ensureById(Number(ref));
+    if (typeof ref === 'object') {
+      const id = ref.id ?? ref.ID;
+      if (id) return this.ensureById(Number(id));
+      return ref.url ? this.ensureByUrl(ref.url) : null;
+    }
+    return this.ensureByUrl(String(ref));
+  }
+
+  async ensureById(id) {
+    const item = this.byId.get(id);
+    if (!item) {
+      this.log(`  ! media ${id} is not in the export (deleted, or not readable without auth)`);
+      return null;
+    }
+    return this.#put(`wp:${id}`, {
+      url: item.source_url,
+      localFile: item.localFile ? path.join(this.exportDir, item.localFile) : null,
+      fileName: fileNameOf(item.source_url),
+      mime: item.mime_type,
+      width: item.media_details?.width,
+      height: item.media_details?.height,
+      fileInfo: {
+        alternativeText: item.alt_text || htmlToText(item.title?.rendered) || null,
+        caption: htmlToText(item.caption?.rendered) || null,
+      },
+    });
+  }
+
+  async ensureByUrl(url) {
+    let abs;
+    try {
+      abs = new URL(url, this.siteUrl).href;
+    } catch {
+      return null;
+    }
+    const item = this.find(abs);
+    if (item) return this.ensureById(item.id);
+    const external = new URL(abs).host !== new URL(this.siteUrl).host;
+    if (external && !this.uploadExternal) return null;
+    return this.#put(`url:${abs}`, { url: abs, fileName: fileNameOf(abs), fileInfo: {} });
+  }
+
+  async #put(key, src) {
+    if (this.dryRun) {
+      // No uploads in a dry run: hand back a stand-in so conversion can proceed.
+      return {
+        id: 0,
+        dryRun: true,
+        name: src.fileName,
+        url: src.url,
+        width: src.width ?? 1,
+        height: src.height ?? 1,
+        mime: src.mime,
+        alternativeText: src.fileInfo.alternativeText ?? null,
+        caption: src.fileInfo.caption ?? null,
+      };
+    }
+
+    const cached = this.state.media[key];
+    if (cached) {
+      if (this.verified.has(cached.id)) return cached;
+      const still = await this.strapi.getFile(cached.id);
+      if (still) {
+        this.verified.add(still.id);
+        return (this.state.media[key] = still);
+      }
+      delete this.state.media[key]; // Strapi was reset since the last run — upload again
+    }
+
+    let bytes;
+    let type = src.mime;
+    if (src.localFile && existsSync(src.localFile)) {
+      bytes = await readFile(src.localFile);
+    } else {
+      const res = await fetch(src.url);
+      if (!res.ok) {
+        this.log(`  ! could not download ${src.url} (${res.status})`);
+        return null;
+      }
+      bytes = Buffer.from(await res.arrayBuffer());
+      type ??= res.headers.get('content-type')?.split(';')[0];
+    }
+
+    const blob = new Blob([bytes], { type: type || 'application/octet-stream' });
+    const file = await this.strapi.upload(blob, src.fileName, { name: src.fileName, ...src.fileInfo });
+    this.state.media[key] = file;
+    this.state.save();
+    this.verified.add(file.id);
+    this.log(`  + uploaded ${src.fileName} → file ${file.id}`);
+    return file;
+  }
+}

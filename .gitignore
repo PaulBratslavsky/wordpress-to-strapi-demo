@@ -1,0 +1,18 @@
+# Commercial theme files (ThemeForest licence — not redistributable)
+reference-projects/
+
+# Local site credentials (admin + application passwords)
+.local-secrets/
+
+# Built plugin zip (attach to a GitHub release instead)
+wordpress/dist/
+
+# Migration run artifacts
+node_modules/
+.env
+wp-export/
+.migration-state.json
+migration-report.json
+redirects.json
+
+.DS_Store
