@@ -72,7 +72,13 @@ async function main() {
   }
 
   async function valueFor(item, field, t, warn) {
-    const raw = getPath(item, field.from);
+    let raw = getPath(item, field.from);
+    // Mirror analyze.js: a scalar field whose value arrived as a one-item array
+    // (or the same value repeated) is that value.
+    if (Array.isArray(raw) && raw.length && field.type !== 'json' && field.type !== 'relation' && !field.multiple) {
+      const identical = new Set(raw.map((x) => JSON.stringify(x))).size === 1;
+      if (raw.length === 1 || identical) raw = raw[0];
+    }
     switch (field.transform ?? 'raw') {
       case 'text': {
         const v = raw && typeof raw === 'object' ? raw.raw?.trim() || raw.rendered : raw;

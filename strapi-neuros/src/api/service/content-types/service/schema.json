@@ -1,0 +1,76 @@
+{
+  "kind": "collectionType",
+  "collectionName": "services",
+  "info": {
+    "singularName": "service",
+    "pluralName": "services",
+    "displayName": "Service",
+    "description": "Migrated from WordPress (postType: neuros_service)"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "string"
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "title"
+    },
+    "content": {
+      "type": "blocks"
+    },
+    "excerpt": {
+      "type": "text"
+    },
+    "featuredImage": {
+      "type": "media",
+      "multiple": false,
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos",
+        "audios"
+      ]
+    },
+    "servicesCategory": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::services-category.services-category"
+    },
+    "servicesTag": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::services-tag.services-tag"
+    },
+    "publishedDate": {
+      "type": "datetime"
+    },
+    "wpId": {
+      "type": "integer"
+    },
+    "wpLink": {
+      "type": "string"
+    },
+    "iconSvg": {
+      "type": "blocks"
+    },
+    "description": {
+      "type": "blocks"
+    },
+    "titleStatus": {
+      "type": "string"
+    },
+    "pageTopBorderRadius": {
+      "type": "string"
+    },
+    "subtitle": {
+      "type": "string"
+    },
+    "mediaStatus": {
+      "type": "string"
+    }
+  }
+}

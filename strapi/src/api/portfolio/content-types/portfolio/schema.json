@@ -1,0 +1,29 @@
+{
+  "kind": "collectionType",
+  "collectionName": "portfolios",
+  "info": {
+    "singularName": "portfolio",
+    "pluralName": "portfolios",
+    "displayName": "Category",
+    "description": "Migrated from WordPress (taxonomy: portfolio)"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string"
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "name"
+    },
+    "wpId": {
+      "type": "integer"
+    },
+    "wpLink": {
+      "type": "string"
+    }
+  }
+}

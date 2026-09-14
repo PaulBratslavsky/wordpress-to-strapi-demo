@@ -1,0 +1,29 @@
+{
+  "kind": "collectionType",
+  "collectionName": "services_tags",
+  "info": {
+    "singularName": "services-tag",
+    "pluralName": "services-tags",
+    "displayName": "Service Tag",
+    "description": "Migrated from WordPress (taxonomy: neuros_services_tag)"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string"
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "name"
+    },
+    "wpId": {
+      "type": "integer"
+    },
+    "wpLink": {
+      "type": "string"
+    }
+  }
+}

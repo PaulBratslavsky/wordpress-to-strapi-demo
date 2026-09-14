@@ -16,6 +16,19 @@ import { itemsOf } from './lib/source.js';
 // Fields that intentionally keep the old URL.
 const KEEP_OLD_URLS = new Set(['wpLink', 'avatarUrl', 'website']);
 
+/** Drop those fields at every depth: populated relations carry their own wpLink. */
+function stripKeptUrls(value) {
+  if (Array.isArray(value)) return value.map(stripKeptUrls);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(
+      Object.entries(value)
+        .filter(([key]) => !KEEP_OLD_URLS.has(key))
+        .map(([key, v]) => [key, stripKeptUrls(v)])
+    );
+  }
+  return value;
+}
+
 async function main() {
   const args = parseArgs(process.argv);
   const config = loadJson(args.config || 'migration.config.json');
@@ -34,8 +47,7 @@ async function main() {
     let missingMedia = 0;
     for await (const doc of strapi.list(t.pluralName, { populate: '*' })) {
       actual++;
-      const scanned = Object.fromEntries(Object.entries(doc).filter(([k]) => !KEEP_OLD_URLS.has(k)));
-      if (JSON.stringify(scanned).includes(`//${oldHost}`)) oldHostRefs++;
+      if (JSON.stringify(stripKeptUrls(doc)).includes(`//${oldHost}`)) oldHostRefs++;
       const item = byWpId.get(doc.wpId);
       for (const [name, f] of mediaFields) {
         const had = getPath(item, f.from);

@@ -25,7 +25,19 @@ const RESERVED_MODELS = new Set(['boolean', 'date', 'date-time', 'datetime', 'ti
 
 // Theme presentation settings stored as post meta — layout, not content.
 const LAYOUT_KEY =
-  /(^|_)(header|footer|sidebar|layout|colou?r|bg|background|style|padding|margin|font|typography|width|height|opacity|overlay|css|class|template|top_bar|page_title|breadcrumbs?|side_panel|sticky|position|align|columns?|animation|parallax|hover)(_|$)/i;
+  /(^|_)(header|footer|sidebar|layout|colou?r|bg|background|style|padding|margin|font|typography|width|height|opacity|overlay|css|class|template|top_bar|page_title|breadcrumbs?|side_panel|sticky|position|align|columns?|animation|parallax|hover|hide|toggle|visibility)(_|$)/i;
+
+// Words that look plural but aren't.
+const NEVER_SINGULAR = new Set( ['news', 'press', 'series', 'status', 'analytics', 'media', 'address', 'campus'] );
+
+/** "services" → "service", "stories" → "story"; leaves "team" and "news" alone. */
+const singularize = (s) => {
+  if (NEVER_SINGULAR.has(s) || /(ss|us|is)$/.test(s) || !/s$/.test(s)) return s;
+  return /ies$/.test(s) ? s.replace(/ies$/, 'y') : s.replace(/s$/, '');
+};
+
+// Labels too generic to tell two types apart in the Strapi admin.
+const GENERIC_LABELS = new Set( ['category', 'categories', 'tag', 'tags', 'post', 'page', 'item', 'entry', 'term'] );
 const MEDIA_KEY = /(image|img|photo|logo|icon|thumb|avatar|picture|gallery|file|video|audio|cover|banner|attachment|media)/i;
 
 const isEmpty = (v) =>
@@ -36,8 +48,16 @@ const titleCase = (s) => s.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUp
 
 /** Guess a Strapi field for a custom field from the values seen across entries. */
 function infer(key, values, ctx) {
-  const vals = values.filter((v) => !isEmpty(v));
+  let vals = values.filter((v) => !isEmpty(v));
   if (!vals.length) return { skip: 'always empty' };
+
+  // WordPress meta is multi-row, so a single value often arrives as a one-item
+  // array — and a site that was imported twice has the same value in every row.
+  // Judge those by their content instead of calling them JSON.
+  const allArrays = vals.every((v) => Array.isArray(v));
+  const identical = (v) => new Set(v.map((x) => JSON.stringify(x))).size === 1;
+  if (allArrays && vals.every((v) => v.length === 1 || identical(v))) vals = vals.map((v) => v[0]);
+
   const str = vals.every((v) => typeof v === 'string');
   const mediaish = MEDIA_KEY.test(key);
 
@@ -47,6 +67,10 @@ function infer(key, values, ctx) {
   if (lower.every((v) => ['on', 'off', 'yes', 'no', 'true', 'false'].includes(v))) return { type: 'boolean', transform: 'boolean' };
   if (lower.every((v) => v === '0' || v === '1') && /(^|_)(is|has|show|hide|enable|disable|status)(_|$)/i.test(key)) {
     return { type: 'boolean', transform: 'boolean' };
+  }
+  // ACF/Meta Box date pickers store "Ymd" strings, which otherwise look like integers.
+  if (str && vals.every((v) => /^(19|20)\d{6}$/.test(v))) {
+    return { type: 'date', transform: 'date-ymd', note: 'Ymd date string (date picker)' };
   }
   if (vals.every(isIntLike)) {
     if (mediaish && vals.every((v) => ctx.mediaIds.has(Number(v)))) return { type: 'media', multiple: false, transform: 'media' };
@@ -90,14 +114,22 @@ function sameTarget(ids, ctx) {
   return types.size === 1 && !types.has(undefined) ? [...types][0] : null;
 }
 
-/** Common "<theme>_" prefix shared by 2+ custom type slugs (neuros_project, neuros_service → "neuros_"). */
-function sharedPrefix(slugs) {
+/**
+ * A theme/plugin prefix worth stripping from type slugs: neuros_project,
+ * neuros_service, neuros_vacancy → "neuros_". Needs three or more types to
+ * avoid mangling families like portfolio_item / portfolio_layout (which would
+ * otherwise become "item" and "layout"), and never strips a prefix that is
+ * itself one of the site's types or taxonomies.
+ */
+function sharedPrefix(slugs, known) {
   const counts = {};
   for (const s of slugs) {
-    const m = s.match(/^([a-z0-9]+_)/);
+    const m = s.match(/^([a-z0-9]+)_/);
     if (m) counts[m[1]] = (counts[m[1]] || 0) + 1;
   }
-  return Object.entries(counts).filter(([, n]) => n >= 2).map(([p]) => p);
+  return Object.entries(counts)
+    .filter(([prefix, n]) => n >= 3 && !known.has(prefix))
+    .map(([prefix]) => `${prefix}_`);
 }
 
 function main() {
@@ -122,12 +154,15 @@ function main() {
     ...Object.keys(data.entries).filter((s) => !['post', 'page'].includes(s)),
     ...Object.keys(data.terms).filter((s) => !['category', 'post_tag'].includes(s)),
   ];
-  const prefixes = sharedPrefix(customSlugs);
+  const prefixes = sharedPrefix(customSlugs, new Set([...Object.keys(data.entries), ...Object.keys(data.terms)]));
   const baseName = (slug) => {
     if (slug === 'post_tag') return 'tag';
     const p = prefixes.find((x) => slug.startsWith(x));
-    return kebab(p ? slug.slice(p.length) : slug);
+    return singularize(kebab(p ? slug.slice(p.length) : slug));
   };
+  /** WordPress labels are often just "Category" or "Item"; fall back to the slug then. */
+  const displayName = (label, slug) =>
+    label && !GENERIC_LABELS.has(String(label).toLowerCase()) ? label : titleCase(baseName(slug));
   const names = {}; // "postType:post" | "taxonomy:category" | "users" → singularName
   const taken = new Set();
   const claim = (key, wanted) => {
@@ -175,11 +210,17 @@ function main() {
         if (handled.has(key)) continue; // registered meta wins over the raw copy
         handled.add(key);
         const values = items.map((e) => get(e)?.[key]);
-        if (src === 'migration_meta') {
-          if (key.startsWith('_')) {
-            ignored[key] = key === '_elementor_data' ? 'Elementor layout JSON (see references/page-builders.md)' : 'private meta';
-            continue;
-          }
+
+        // Underscore-prefixed keys are plugin/theme bookkeeping wherever they appear
+        // (ACF's field references, Elementor's layout JSON, WordPress internals).
+        if (key.startsWith('_')) {
+          ignored[key] = '_elementor_data' === key ? 'Elementor layout JSON (see references/page-builders.md)' : 'internal plugin meta';
+          continue;
+        }
+        if ('footnotes' === key) continue;
+
+        // ACF fields are deliberate content; only guess about raw meta.
+        if (src !== 'acf') {
           if (LAYOUT_KEY.test(key)) {
             ignored[key] = 'looks like a theme layout/display setting';
             continue;
@@ -189,7 +230,6 @@ function main() {
             ignored[key] = 'same value on every entry — probably a theme default';
             continue;
           }
-          if (key === 'footnotes') continue;
         }
         const guess = infer(key, values, ctx);
         if (guess.skip) {
@@ -226,7 +266,7 @@ function main() {
   for (const [slug, list] of Object.entries(data.terms)) {
     if (!list.length) continue;
     const tax = data.taxonomies[slug];
-    const t = makeType(`taxonomy:${slug}`, { kind: 'taxonomy', slug }, tax.labels?.singular_name || titleCase(baseName(slug)));
+    const t = makeType(`taxonomy:${slug}`, { kind: 'taxonomy', slug }, displayName(tax.labels?.singular_name, slug));
     t.urlPattern = null;
     t.fields = {
       name: { type: 'string', from: 'name', transform: 'text' },
@@ -246,7 +286,7 @@ function main() {
       continue;
     }
     const wpType = data.types[slug];
-    const t = makeType(`postType:${slug}`, { kind: 'postType', slug }, wpType.labels?.singular_name || titleCase(baseName(slug)));
+    const t = makeType(`postType:${slug}`, { kind: 'postType', slug }, displayName(wpType.labels?.singular_name, slug));
     const has = (fn) => items.some(fn);
     const f = t.fields;
 
