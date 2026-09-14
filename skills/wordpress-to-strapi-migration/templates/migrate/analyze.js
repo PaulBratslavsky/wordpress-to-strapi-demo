@@ -320,6 +320,7 @@ function main() {
       ...(authors.some((u) => u.url) && { website: { type: 'string', from: 'url', transform: 'raw' } }),
       avatarUrl: { type: 'string', from: 'avatar_urls.96', transform: 'raw' },
       wpId: { type: 'integer', from: 'id', transform: 'raw' },
+      wpSite: { type: 'string', transform: 'site' },
     };
     if (data.users.length > authors.length) flag(`author: ${data.users.length - authors.length} WordPress users never authored exported content and are not migrated`);
   }
@@ -336,6 +337,7 @@ function main() {
       ...(list.some((x) => x.description) && { description: { type: 'text', from: 'description', transform: 'text' } }),
       ...(tax.hierarchical && list.some((x) => x.parent) && { parent: { type: 'relation', relation: 'manyToOne', target: t.singularName, from: 'parent' } }),
       wpId: { type: 'integer', from: 'id', transform: 'raw' },
+      wpSite: { type: 'string', transform: 'site' },
       wpLink: { type: 'string', from: 'link', transform: 'raw' },
     };
     addCustomFields(t, list, t.singularName);
@@ -389,6 +391,7 @@ function main() {
     if (has((e) => e.status !== 'publish')) f.wpStatus = { type: 'string', from: 'status', transform: 'raw' };
     if (has((e) => e.yoast_head_json)) f.seo = { type: 'component', component: 'shared.seo', from: 'yoast_head_json', transform: 'seo-yoast' };
     f.wpId = { type: 'integer', from: 'id', transform: 'raw' };
+    f.wpSite = { type: 'string', transform: 'site' };
     f.wpLink = { type: 'string', from: 'link', transform: 'raw' };
     if (slug === 'post') t.urlPattern = null;
 

@@ -22,6 +22,9 @@
     "wpId": {
       "type": "integer"
     },
+    "wpSite": {
+      "type": "string"
+    },
     "wpLink": {
       "type": "string"
     }

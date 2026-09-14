@@ -39,6 +39,8 @@ async function main() {
 
   const siteUrl = data.site.home;
   const strapiUrl = (process.env.STRAPI_URL || 'http://localhost:1337').replace(/\/$/, '');
+  // Part of the idempotency key: one Strapi can hold migrations from several sites.
+  const sourceHost = new URL(siteUrl).host;
   const strapi = new StrapiClient({ baseUrl: strapiUrl, token: dryRun ? process.env.STRAPI_API_TOKEN || '' : requireEnv('STRAPI_API_TOKEN') });
   const state = new MigrationState();
   const media = new MediaLibrary({
@@ -139,6 +141,8 @@ async function main() {
         }
         return Object.keys(value).length ? value : undefined;
       }
+      case 'site':
+        return sourceHost;
       case 'slug':
         return slugs[t.singularName].get(item.id);
       case 'date-gmt': {
@@ -229,7 +233,7 @@ async function main() {
           mkdirSync(path.join(previewDir, t.singularName), { recursive: true });
           writeFileSync(path.join(previewDir, t.singularName, `${slug}.json`), JSON.stringify({ status, payload, warnings: found }, null, 2));
         } else {
-          const existing = await strapi.findByWpId(t.pluralName, item.id);
+          const existing = await strapi.findByWpId(t.pluralName, item.id, sourceHost);
           const rec = existing
             ? await strapi.update(t.pluralName, existing.documentId, payload, { status })
             : await strapi.create(t.pluralName, payload, { status });
@@ -252,7 +256,8 @@ async function main() {
     const map = idMaps[target];
     if (map.size || dryRun) return map;
     // Target type wasn't migrated in this run (--only): read its wpId → documentId from Strapi.
-    for await (const doc of strapi.list(config.types[target].pluralName, { 'fields[0]': 'wpId' })) map.set(doc.wpId, doc.documentId);
+    const params = { 'fields[0]': 'wpId', 'filters[wpSite][$eq]': sourceHost };
+    for await (const doc of strapi.list(config.types[target].pluralName, params)) map.set(doc.wpId, doc.documentId);
     return map;
   }
 
@@ -292,7 +297,11 @@ async function main() {
   writeFileSync('redirects.json', JSON.stringify(links.redirects, null, 2) + '\n');
   writeFileSync(
     'migration-report.json',
-    JSON.stringify({ finishedAt: new Date().toISOString(), dryRun, counts, failures, warnings }, null, 2) + '\n'
+    JSON.stringify(
+      { finishedAt: new Date().toISOString(), dryRun, counts, failures, media: media.failures, warnings },
+      null,
+      2
+    ) + '\n'
   );
 
   console.log(`\n${dryRun ? 'Dry run' : 'Migration'} complete.`);
@@ -301,6 +310,11 @@ async function main() {
   if (warnings.length) {
     console.log('Warnings by kind (details in migration-report.json):');
     console.table(byCode);
+  }
+  if (media.failures.length) {
+    console.log(`\n${media.failures.length} file(s) could not be migrated (listed under "media" in migration-report.json):`);
+    for (const f of media.failures.slice(0, 5)) console.log(`  ${f.url}\n    ${f.reason}`);
+    if (media.failures.length > 5) console.log(`  … and ${media.failures.length - 5} more`);
   }
   console.log(`${links.redirects.length} redirect(s) → redirects.json`);
   if (dryRun) console.log(`Previews → ${previewDir}/<type>/<slug>.json`);

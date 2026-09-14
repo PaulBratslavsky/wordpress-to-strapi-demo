@@ -16,17 +16,31 @@ import { itemsOf } from './lib/source.js';
 // Fields that intentionally keep the old URL.
 const KEEP_OLD_URLS = new Set(['wpLink', 'avatarUrl', 'website']);
 
-/** Drop those fields at every depth: populated relations carry their own wpLink. */
-function stripKeptUrls(value) {
-  if (Array.isArray(value)) return value.map(stripKeptUrls);
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value)
-        .filter(([key]) => !KEEP_OLD_URLS.has(key))
-        .map(([key, v]) => [key, stripKeptUrls(v)])
-    );
-  }
-  return value;
+/**
+ * Count strings that still mention the old WordPress host, split in two.
+ *
+ * A media record carries its WordPress caption and alt text verbatim, and those
+ * sometimes quote the file's old URL. That is the caption's content, not a link
+ * still pointing at the old site, so it's counted separately rather than
+ * reported as a migration problem. Fields in KEEP_OLD_URLS are skipped at every
+ * depth, because populated relations carry their own wpLink.
+ */
+function oldHostHits(value, oldHost) {
+  const hits = { content: 0, captions: 0 };
+  const walk = (node, inMedia) => {
+    if (Array.isArray(node)) return node.forEach((v) => walk(v, inMedia));
+    if (node && typeof node === 'object') {
+      const isMedia = Boolean(node.url && (node.mime || node.provider || node.ext));
+      for (const [key, v] of Object.entries(node)) {
+        if (KEEP_OLD_URLS.has(key)) continue;
+        walk(v, inMedia || isMedia);
+      }
+      return;
+    }
+    if (typeof node === 'string' && node.includes(`//${oldHost}`)) hits[inMedia ? 'captions' : 'content'] += 1;
+  };
+  walk(value, false);
+  return hits;
 }
 
 /**
@@ -57,10 +71,13 @@ async function main() {
     const mediaFields = Object.entries(t.fields).filter(([, f]) => f.type === 'media');
     let actual = 0;
     let oldHostRefs = 0;
+    let captionRefs = 0;
     let missingMedia = 0;
     for await (const doc of strapi.list(t.pluralName, populateFor(t))) {
       actual++;
-      if (JSON.stringify(stripKeptUrls(doc)).includes(`//${oldHost}`)) oldHostRefs++;
+      const hits = oldHostHits(doc, oldHost);
+      if (hits.content) oldHostRefs++;
+      if (hits.captions) captionRefs++;
       const item = byWpId.get(doc.wpId);
       for (const [name, f] of mediaFields) {
         const had = getPath(item, f.from);
@@ -68,13 +85,15 @@ async function main() {
         if (had && !(Array.isArray(had) && !had.length) && !hasNow) missingMedia++;
       }
     }
+    // A caption quoting an old URL is not a migration problem, so it doesn't fail the check.
     const ok = actual === items.length && !oldHostRefs && !missingMedia;
     if (!ok) problems++;
-    rows[t.singularName] = { wordpress: items.length, strapi: actual, oldHostRefs, missingMedia, ok: ok ? '✓' : '✗' };
+    rows[t.singularName] = { wordpress: items.length, strapi: actual, oldHostRefs, inCaptions: captionRefs, missingMedia, ok: ok ? '✓' : '✗' };
   }
   console.table(rows);
   if (problems) {
-    console.log('oldHostRefs: entries whose fields still contain the WordPress URL (search migration-report.json for file-link-missing / image-missing).');
+    console.log('oldHostRefs: entries whose content still contains the WordPress URL (search migration-report.json for file-link-missing / image-missing).');
+    console.log('inCaptions: the URL appears inside a media caption or alt text, copied from WordPress. Not counted as a problem.');
     process.exitCode = 1;
   } else {
     console.log('Everything in the export is in Strapi.');

@@ -81,13 +81,17 @@ collection over copying the text.
 
 ## P2 — Close the fidelity gaps the runs exposed
 
-### 2.1 Media that can't be fetched
+### 2.1 Media that can't be fetched — **done**
 
-13 images on Neuros failed to download and stayed as original URLs in the body. Add:
-retries with backoff, a `--media-report` listing every unreachable file with the entries
-that use it, and a config choice between leaving the original URL and dropping the image.
+Every file the migration can't move is recorded once with its reason, printed at the end of
+the run, and written to `migration-report.json` under `media`. A refused upload no longer
+takes the entry down with it.
 
-*Evidence:* `image-failed` ×13 on Neuros, ×1 on Northfield (a deliberately dead domain).
+Still open: retries with backoff, and a config choice between dropping the image and leaving
+the original URL in place.
+
+*Evidence:* on Neuros the report names the two SVGs Strapi refuses
+(`File type 'image/svg+xml' is not allowed`), used across thirteen places.
 
 ### 2.2 Audio, video and iframes
 
@@ -122,22 +126,37 @@ and offer `--skip-types svg` rather than failing per image.
 
 *Evidence:* `image-failed ×13` on Neuros, all `.svg`, across pages that share a logo.
 
-### 2.7 Custom fields that hold media URLs
+### 2.7 Old URLs inside media captions and alt text — **done**
 
-Meta Box's `project_audio_file` stores a URL to an MP3 on the old site. It was migrated as
-a string, so five projects still point at WordPress for their audio. When a field's values
-are URLs under `/wp-content/uploads/`, treat it as media: upload the file and store the
-Strapi media reference.
+Five Neuros projects were reported as "still containing the old WordPress host". Chasing it
+down: the file itself migrated correctly (`audioFile` → a Strapi media record), and the old
+URL is sitting inside the **attachment's caption**, which in WordPress is literally the text
+`http://neuros.local/wp-content/uploads/2024/05/audio_sample.mp3 "Impact Moderato"…`.
+
+So the migration is right and the check is wrong. `verify.js` should count a URL inside a
+media record's `caption` or `alternativeText` separately from content that still points at
+the old site, and say which it found. Optionally, offer to rewrite uploads URLs inside
+captions at migration time.
+
+*(An earlier version of this item claimed the field held a URL that migrated as a string.
+That was wrong: `project_audio_file` holds an attachment id, and it became a media field.)*
 
 ---
 
 ## P3 — Robustness
 
-### 3.1 Namespace the idempotency key
+### 3.1 Namespace the idempotency key — **done**
 
-Entries are matched on `wpId`. Two WordPress sites migrated into one Strapi would collide,
-because both number their posts from 1. Add `wpSite` (the source host) and match on the
-pair. We sidestepped this in testing by running a second Strapi.
+Every type now carries `wpSite` (the source host) alongside `wpId`, and lookups match on the
+pair, so one Strapi can hold migrations from several WordPress sites without one site's post
+42 updating another's.
+
+**Changing a key mid-stream is its own hazard, and it bit us.** With the site added to the
+match, already-migrated entries (which had no `wpSite`) stopped matching, so the run tried to
+create second copies: 7 entries failed on `This attribute must be unique` and 2 duplicates
+got through before we stopped. The lookup now falls back to entries whose `wpSite` is null,
+matching them and filling the field in. Re-running against both sites then updated all 36 and
+343 entries in place, with nothing duplicated.
 
 ### 3.2 Parallel uploads and resume
 

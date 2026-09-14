@@ -381,12 +381,29 @@ WordPress host. Two specific problems, both worth knowing before you run a real 
    SVG. The migration now drops a refused image and reports it as `section-image-dropped`
    instead of leaving the old URL behind, which is why those pages verify clean in the second
    run further down.
-2. **A custom field holding a media URL stays a string.** Meta Box's `project_audio_file`
-   points at an MP3 in `wp-content/uploads`. It migrated as text, so five projects still
-   reference the old server. That one is still open.
+2. **A media caption that quotes the old URL looks like a leftover.** Five projects were
+   flagged for containing the WordPress host. The file had migrated fine: the field holds an
+   attachment id, it became a media field, and the MP3 is in the Strapi library. The old URL
+   is inside the *attachment's caption*, because that is what the caption says in WordPress.
+   The migration was right and the check was too blunt. Worth knowing, because you will chase
+   this one before you find it.
 
 Neither is a failure of the content model. Every entry, term, relation and featured image
 arrived. Both are the kind of thing that only shows up when you check.
+
+After fixing those, every type on both sites verifies clean. `verify.js` now reports two
+different things separately: content still pointing at WordPress, which fails the check, and
+a URL sitting inside a media caption, which is just what the caption says. The migration also
+prints every file it could not move, with the reason:
+
+```
+2 file(s) could not be migrated (listed under "media" in migration-report.json):
+  http://neuros.local/wp-content/uploads/2024/02/Logo.svg
+    POST /api/upload -> 400 File type 'image/svg+xml' is not allowed
+```
+
+Two files rather than thirteen, because each file is attempted once and those two logos were
+used in thirteen places.
 
 The other warnings from that first run, with every body going into a Blocks field:
 

@@ -66,14 +66,24 @@ export class StrapiClient {
    * migration idempotent: re-running updates the same record instead of
    * creating a duplicate.
    */
-  async findByWpId(pluralApiId, wpId) {
-    const qs = new URLSearchParams({
-      'filters[wpId][$eq]': String(wpId),
-      'pagination[pageSize]': '1',
-      status: 'draft',
-    });
-    const res = await this.request(`/api/${pluralApiId}?${qs}`);
-    return res.data?.[0] ?? null;
+  async findByWpId(pluralApiId, wpId, wpSite) {
+    const lookup = async (filters) => {
+      const qs = new URLSearchParams({ ...filters, 'pagination[pageSize]': '1', status: 'draft' });
+      const res = await this.request(`/api/${pluralApiId}?${qs}`);
+      return res.data?.[0] ?? null;
+    };
+    const byId = { 'filters[wpId][$eq]': String(wpId) };
+
+    // Two WordPress sites both number their posts from 1, so the source host is
+    // part of the key whenever one Strapi holds more than one migration.
+    if (!wpSite) return lookup(byId);
+
+    return (
+      (await lookup({ ...byId, 'filters[wpSite][$eq]': String(wpSite) })) ??
+      // Entries migrated before wpSite existed have none; match those too, so a
+      // re-run updates them (and fills the field in) instead of duplicating.
+      (await lookup({ ...byId, 'filters[wpSite][$null]': 'true' }))
+    );
   }
 
   /** Number of documents in a collection (drafts included). */

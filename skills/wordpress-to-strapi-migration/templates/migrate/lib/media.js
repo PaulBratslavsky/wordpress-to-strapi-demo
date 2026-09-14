@@ -44,6 +44,9 @@ export class MediaLibrary {
     this.byId = new Map(items.map((m) => [m.id, m]));
     this.byPath = new Map();
     this.verified = new Set();
+    // Files that couldn't be fetched or that Strapi refused, for the run report.
+    this.failures = [];
+    this.failed = new Set();
     for (const m of items) {
       const add = (u) => {
         const k = u && urlKey(u, siteUrl);
@@ -67,6 +70,14 @@ export class MediaLibrary {
       this.byPath.get(unsized.replace(/(\.[a-z0-9]+)$/, '-scaled$1')) ??
       null
     );
+  }
+
+  /** Record a file we couldn't migrate, once per file, so the report can list them. */
+  recordFailure(key, url, reason) {
+    if (this.failed.has(key)) return null;
+    this.failed.add(key);
+    this.failures.push({ url, reason: String(reason).slice(0, 200) });
+    return null;
   }
 
   /** Absolute URL for a Strapi file (the local upload provider returns "/uploads/..."). */
@@ -155,7 +166,7 @@ export class MediaLibrary {
       const res = await fetch(src.url);
       if (!res.ok) {
         this.log(`  ! could not download ${src.url} (${res.status})`);
-        return null;
+        return this.recordFailure(key, src.url, `download failed (${res.status})`);
       }
       bytes = Buffer.from(await res.arrayBuffer());
       type ??= res.headers.get('content-type')?.split(';')[0];
@@ -169,7 +180,7 @@ export class MediaLibrary {
       // Strapi refuses some types outright — SVG unless you allow it in the upload
       // settings. One rejected file shouldn't take the whole entry down with it.
       this.log(`  ! Strapi refused ${src.fileName}: ${err.message}`);
-      return null;
+      return this.recordFailure(key, src.url, err.message);
     }
     this.state.media[key] = file;
     this.state.save();

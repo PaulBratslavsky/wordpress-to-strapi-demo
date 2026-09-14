@@ -211,6 +211,7 @@ None of these showed up in unit-sized testing; all appeared on real content.
 | Two content types both displayed as "Category" | WordPress labels are often generic | fall back to the type slug when the label is generic |
 | Every Meta Box field typed as JSON | values arrived as one-item arrays | judge one-item (and identically repeated) arrays by their content |
 | Verify reporting old-host URLs everywhere | the scan skipped `wpLink` at the top level, but populated relations carry their own | strip those keys at every depth |
+| Adding `wpSite` to the match key duplicated entries | already-migrated entries had no `wpSite`, so they stopped matching and the run tried to create copies — 7 failed on `This attribute must be unique`, 2 duplicates got through | fall back to entries whose `wpSite` is null, match them and fill the field in. **Changing an idempotency key on live data needs a fallback, or a re-run silently forks your content.** |
 
 ---
 
@@ -293,13 +294,41 @@ anyone runs a real migration:
    URLs inside 12 pages. The new site would load its own logo from the old CMS. Allow the
    type in Strapi's upload settings, or convert the files, before migrating a theme that
    uses SVG.
-2. **A custom field holding a media URL stays a string.** Meta Box's `project_audio_file`
-   points at an MP3 in `wp-content/uploads`. It migrated as text, so five projects still
-   reference the old server. Fields whose values are uploads URLs should be treated as
-   media.
+2. **A media caption that contains the old URL looks like a leftover, and isn't.** Five
+   projects were flagged for still containing the WordPress host. The file itself migrated
+   correctly: `project_audio_file` holds an attachment id, became a Strapi media field, and
+   the MP3 is in the library. The old URL is inside the *attachment's caption*, which in
+   WordPress is literally the text
+   `http://neuros.local/…/audio_sample.mp3 "Impact Moderato"…`. The migration was right and
+   the check was too blunt — `verify.js` should report a URL inside a caption separately from
+   content that still points at the old site.
 
 Neither is a failure of the content model — every entry, taxonomy term, relation and
 featured image arrived — but both are the kind of thing that only shows up when you check.
+
+**Where both sites ended up.** After fixing the two problems above, every type on both sites
+verifies clean:
+
+```
+│ project           │ 17        │ 17     │ 0           │ 5          │ 0            │ '✓' │
+                                           oldHostRefs   inCaptions   missingMedia
+```
+
+`verify.js` now separates the two: `oldHostRefs` is content still pointing at WordPress and
+fails the check; `inCaptions` is a URL sitting inside a media caption copied from WordPress,
+which is reported and not treated as a problem.
+
+The migration also lists every file it couldn't move, with the reason:
+
+```
+2 file(s) could not be migrated (listed under "media" in migration-report.json):
+  http://neuros.local/wp-content/uploads/2024/02/Logo.svg
+    POST /api/upload -> 400 File type 'image/svg+xml' is not allowed
+```
+
+Two files, not thirteen: uploads are attempted once per file, and those two SVGs were used
+across thirteen places. That distinction matters when you're judging how much is actually
+broken.
 
 Other warnings from this run, and what they mean:
 
