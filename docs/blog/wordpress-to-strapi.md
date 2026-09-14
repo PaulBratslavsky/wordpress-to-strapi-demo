@@ -179,7 +179,10 @@ Four things to check:
 - **`ignoredMeta`.** Keys the analyzer dropped as theme settings. Read this list. If something
   in it was actually content, move it back into `fields`.
 - **`urlPattern`.** Leave it `null` to keep WordPress's URLs, or set `/blog/{slug}` and get a
-  `redirects.json` for every path that changes.
+  `redirects.json` for every path that changes. Some slugs change whether you ask or not — a
+  Strapi uid has to be ASCII and unique per type, so accented slugs are transliterated and
+  colliding ones suffixed — and those get a redirect either way. That is the case worth
+  catching, because it is how a migration quietly loses its inbound links.
 
 Editing this file costs minutes. Re-running a migration you got wrong costs a lot more.
 

@@ -13,11 +13,11 @@ Priorities are ordered by how much they change the quality of a migration, not b
 > and the results in [`migration-findings.md`](migration-findings.md).
 >
 > **Done since:** 1.3's ACF Group → component half, 2.1 (media failures reported rather than
-> fatal), 2.3 (menus → a navigation single type), 2.7 (caption URLs counted apart from stale
-> content), 3.1 (`wpSite` namespacing), 3.3 (preflight) and 3.5 (the written plan file),
-> alongside 4.1–4.3.
+> fatal), 2.3 (menus → a navigation single type), 2.5 (redirects for slugs that change), 2.7
+> (caption URLs counted apart from stale content), 3.1 (`wpSite` namespacing), 3.3 (preflight)
+> and 3.5 (the written plan file), alongside 4.1–4.3.
 >
-> **Still open:** 1.3's repeating lists, 1.4, 2.2, 2.4–2.6, 3.2, 3.4 and 4.4.
+> **Still open:** 1.3's repeating lists, 1.4, 2.2, 2.4, 2.6, 3.2, 3.4 and 4.4.
 
 ---
 
@@ -131,11 +131,26 @@ Not migrated, by design, but the tool should say what the options are (a Strapi 
 plugin, or a `comment` collection with a relation to the entry) rather than only counting
 them.
 
-### 2.5 Redirects that are actually useful
+### 2.5 Redirects that are actually useful — **done**
 
-`redirects.json` was empty on both runs because URLs are preserved by default. Ship
-`urlPattern` presets (`/blog/{slug}`, `/{path}`) and emit redirects whenever a slug is
-transliterated or de-duplicated, which is exactly when a site silently loses SEO.
+`redirects.json` was empty on both runs because URLs are preserved by default — but the gap
+underneath was worse than "no redirect". With `urlPattern: null` the new path was the *old*
+path, so when a slug could not survive the trip (a Strapi uid must be ASCII and unique per
+type, so accented slugs are transliterated and colliding ones suffixed) the entry moved and
+nothing recorded it. `rewrite()` then resolved internal links to the old path too, pointing
+migrated content at a URL that no longer existed.
+
+The new path now follows the final slug — the old path with its last segment replaced — so a
+changed slug produces both a redirect and correct internal links, while an unchanged slug
+still produces neither. The plan document explains `urlPattern` and its usual presets
+(`/blog/{slug}`, `/{path}`, `{id}`) where the reviewer decides.
+
+*Honest evidence:* the logic is covered by `test/redirects.test.js`, but **neither demo site
+exercises it**. Northfield: 64 slugs, none accented, none colliding. Neuros: 139 slugs, one
+that changes (`refund_returns` → `refund-returns`) — and that one is WooCommerce's sample
+page, a draft whose permalink is `?page_id=12`, so it has no public URL to redirect from.
+Zero redirects is the correct output for both. A site with accented or colliding published
+slugs would be the real test.
 
 ### 2.6 File types Strapi rejects
 

@@ -105,6 +105,18 @@ export function planMarkdown(config, data, flags = []) {
   }
 
   out.push(
+    '## URLs',
+    '',
+    "Each type has a `urlPattern`. Leaving it `null` keeps WordPress's path, so a frontend that",
+    'mirrors the old permalinks needs no redirects. Setting one moves the type and records every',
+    'old → new pair in `redirects.json`; `/blog/{slug}` and `/{path}` are the usual choices, and',
+    '`{id}` is available too.',
+    '',
+    'Either way, slugs that cannot survive the trip get a redirect: a Strapi uid must be ASCII and',
+    'unique per type, so an accented slug is transliterated and a colliding one is suffixed. Those',
+    'URLs change whether or not you chose a pattern, which is the case worth catching — it is how',
+    'a migration quietly loses its inbound links.',
+    '',
     '## Next steps',
     '',
     '1. Edit `migration.config.json` until this plan describes what you want.',

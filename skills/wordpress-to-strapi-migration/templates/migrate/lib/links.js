@@ -5,14 +5,23 @@
  * ("http://my-site.local/2019/05/our-kitchen/"). After migration those need
  * to point at the new frontend. Each migrated entry gets a new path from its
  * type's `urlPattern` in migration.config.json — e.g. "/blog/{slug}" — and
- * with no pattern the original path is kept (a frontend that mirrors the
- * WordPress permalinks then needs no redirects at all).
+ * with no pattern the original path is kept, so a frontend that mirrors the
+ * WordPress permalinks needs no redirects at all.
+ *
+ * "Kept" holds only as far as the slug does. A Strapi uid has to be ASCII and
+ * unique per type, so an accented slug is transliterated and a colliding one is
+ * suffixed; those URLs change whether or not anyone chose a pattern. The new
+ * path therefore follows the final slug, which is what turns a silent loss of
+ * inbound links into a redirect.
  *
  * Every old → new path pair that differs is collected as a redirect in the
  * `{ source, destination, permanent }` shape Next.js / Vercel understand.
  */
 
 const withSlash = (p) => (p.endsWith('/') ? p : `${p}/`);
+
+/** The same path, with its final segment replaced by the slug the entry ended up with. */
+const withSlug = (p, slug) => p.replace(/[^/]+\/$/, `${slug}/`);
 
 export class LinkRewriter {
   constructor({ siteUrl }) {
@@ -40,7 +49,7 @@ export class LinkRewriter {
     }
     const plain = u.searchParams.has('p') || u.searchParams.has('page_id'); // drafts have no pretty permalink
     const oldPath = plain ? `/${slug}/` : withSlash(u.pathname);
-    const newPath = pattern ? LinkRewriter.fill(pattern, { slug, id, oldPath }) : oldPath;
+    const newPath = pattern ? LinkRewriter.fill(pattern, { slug, id, oldPath }) : withSlug(oldPath, slug);
     if (isPost) this.byId.set(id, newPath);
     if (plain || oldPath === '/') return; // nothing public to redirect from (or it's the front page)
     this.byPath.set(oldPath, newPath);
