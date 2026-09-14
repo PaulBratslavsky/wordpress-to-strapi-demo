@@ -5,6 +5,7 @@ import { loadJson, parseArgs, requireEnv, slugify, htmlToText, getPath, asArray 
 import { checkConfig, preflight } from './lib/preflight.js';
 import { buildNavigation } from './lib/navigation.js';
 import { summaryMarkdown } from './lib/summary.js';
+import { parseSince, changedSince, shouldHydrate } from './lib/since.js';
 import { StrapiClient } from './lib/strapi.js';
 import { MediaLibrary } from './lib/media.js';
 import { LinkRewriter } from './lib/links.js';
@@ -41,6 +42,8 @@ async function main() {
   const limit = args.limit ? Number(args.limit) : Infinity;
   // e.g. --skip-types svg — file types Strapi refuses, not worth attempting.
   const skipTypes = args['skip-types'] ?? '';
+  // e.g. --since 2026-01-01 — only entries WordPress says changed after then.
+  const since = parseSince(args.since);
 
   const siteUrl = data.site.home;
   const strapiUrl = (process.env.STRAPI_URL || 'http://localhost:1337').replace(/\/$/, '');
@@ -226,6 +229,20 @@ async function main() {
 
   const idMaps = Object.fromEntries(types.map((t) => [t.singularName, new Map()])); // type → wpId → documentId
   const statusOf = new Map();
+  // Types this run only partly touched (--since, --limit): their id maps are
+  // incomplete, so pass 2 has to read the rest back from Strapi.
+  const partial = new Set();
+  const hydrated = new Set();
+
+  /** The records to write for a type — everything, unless narrowed by --since or --limit. */
+  const itemsFor = (t) => {
+    const all = itemsOf(data, t);
+    const kept = changedSince(all, since, t.source).slice(0, limit);
+    if (kept.length < all.length) partial.add(t.singularName);
+    return kept;
+  };
+
+  if (since) console.log(`\nOnly entries modified since ${since.toISOString()} (taxonomies and authors always run).`);
   const counts = {};
   const warnings = [];
   const failures = [];
@@ -233,7 +250,7 @@ async function main() {
 
   // --- Pass 1: entries ----------------------------------------------------------
   for (const t of types.filter(selected)) {
-    const items = itemsOf(data, t).slice(0, limit);
+    const items = itemsFor(t);
     console.log(`\n■ ${t.displayName} → /api/${t.pluralName}  (${items.length})`);
     for (const item of items) {
       const slug = slugs[t.singularName].get(item.id);
@@ -273,10 +290,15 @@ async function main() {
   // --- Pass 2: relations ----------------------------------------------------------
   async function idMapFor(target) {
     const map = idMaps[target];
-    if (map.size || dryRun) return map;
-    // Target type wasn't migrated in this run (--only): read its wpId → documentId from Strapi.
+    if (hydrated.has(target)) return map;
+    if (!shouldHydrate(target, { mapSize: map.size, partial, dryRun })) return map;
+    // This run didn't migrate the whole type (--only, --since, --limit), so read the
+    // rest of its wpId → documentId pairs from Strapi. Once per type, not per entry.
+    hydrated.add(target);
     const params = { 'fields[0]': 'wpId', 'filters[wpSite][$eq]': sourceHost };
-    for await (const doc of strapi.list(config.types[target].pluralName, params)) map.set(doc.wpId, doc.documentId);
+    for await (const doc of strapi.list(config.types[target].pluralName, params)) {
+      if (!map.has(doc.wpId)) map.set(doc.wpId, doc.documentId);
+    }
     return map;
   }
 
@@ -286,7 +308,7 @@ async function main() {
     for (const t of types.filter(selected)) {
       const relFields = Object.entries(t.fields).filter(([, f]) => f.type === 'relation');
       if (!relFields.length) continue;
-      for (const item of itemsOf(data, t).slice(0, limit)) {
+      for (const item of itemsFor(t)) {
         const documentId = idMaps[t.singularName].get(item.id);
         if (!documentId) continue;
         const rel = {};

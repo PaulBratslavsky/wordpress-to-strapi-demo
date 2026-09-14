@@ -226,6 +226,13 @@ several WordPress sites without one site's post 42 overwriting another's.
 Your menus are written after pass 1, once every entry has its new URL, so the navigation points
 at the migrated content rather than back at WordPress.
 
+Real cutovers are rarely one migration. People keep publishing while you work, so
+`--since 2026-01-01` narrows a run to what WordPress says changed after a date. Only post types
+can be filtered — terms and users carry no modification date, so they always run, because
+skipping them would create a post whose new category was never made — and an entry with no date
+is migrated rather than skipped. Slugs and links are still computed from the whole set, so
+nothing shifts underneath the content you already moved.
+
 `verify.js` then compares Strapi against the export: counts per type, entries whose fields
 still contain the old WordPress host, and media fields that had a value in WordPress but are
 empty in Strapi. It exits non-zero on any mismatch.

@@ -141,6 +141,7 @@ itself — don't restart the user's server; wait for the reload and poll `/api/<
 ```bash
 node migrate.js --dry-run     # converts everything, writes previews, touches nothing
 node migrate.js               # for real; --only post,page, --limit N, --skip-types svg
+node migrate.js --since 2026-01-01   # catch up on what changed since the last run
 node verify.js
 ```
 
@@ -152,6 +153,12 @@ checks only, so it works without a token.
 
 Pass 1 creates entries with their scalars, rich text and media. Pass 2 wires relations by
 `documentId`. Re-running updates instead of duplicating.
+
+`--since <date>` narrows a run to entries WordPress says changed after then — the cutover
+pattern of migrating, then catching up on what was written meanwhile. Only post types can be
+filtered (terms and users carry no modification date, so they always run), an entry with no
+date is migrated rather than skipped, and slugs and links are still computed from the whole
+set so nothing moves or breaks.
 
 `verify.js` compares counts per type, finds entries that still contain the old WordPress
 host, and finds media fields that had a value in WordPress but are empty in Strapi.

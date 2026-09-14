@@ -16,9 +16,9 @@ Priorities are ordered by how much they change the quality of a migration, not b
 > fatal), 2.3 (menus → a navigation single type), 2.5 (redirects for slugs that change), 2.7
 > (caption URLs counted apart from stale content), 3.1 (`wpSite` namespacing), 3.3 (preflight),
 > 3.5 (the written plan file), 4.4 (the readable run summary), 2.6 (refused file types) and
-> 2.4 (what to do about comments), alongside 4.1–4.3.
+> 2.4 (what to do about comments) and 3.4 (incremental runs), alongside 4.1–4.3.
 >
-> **Still open:** 1.3's repeating lists, 1.4, 2.2, 3.2 and 3.4.
+> **Still open:** 1.3's repeating lists, 1.4, 2.2 and 3.2.
 
 ---
 
@@ -229,11 +229,34 @@ printing every problem at once instead of failing partway through:
 `DATABASE_FILENAME=` empty (SQLite opening a directory) and a TypeScript error in the
 bootstrap file. Both are detectable up front.
 
-### 3.4 Incremental runs
+### 3.4 Incremental runs — **done**
 
-Add `--since <date>` so a second pass only touches entries modified after the first. Useful
-for the real-world pattern of migrating, then catching up on content written during the
-cutover.
+`--since <date>` narrows a run to the entries WordPress says changed after a point in time —
+the real cutover pattern, where you migrate and then catch up on whatever was written while
+you were migrating. Three rules, each of them a way to lose content if you get it wrong:
+
+- **Only post types are filtered.** WordPress reports `modified_gmt` on entries and nothing
+  else — 0 of 64 terms and users on Northfield, 0 of 26 on Neuros — so taxonomies and authors
+  always run. Skipping them would create a post whose new category was never made.
+- **A record with no date is migrated.** Absent evidence of a change is not evidence of no
+  change, and the cost of being wrong is missing content.
+- **Slugs and links are never filtered.** Slugs de-duplicate across the whole set and every
+  entry's URL is registered for link rewriting, so narrowing that pass would change slugs and
+  break internal links. `--since` narrows only what gets written.
+
+Building it exposed a **latent bug that also affected `--limit`**. Pass 2 resolves relations
+through the id map pass 1 fills in, and hydrated the rest from Strapi only when that map was
+*empty* — correct for `--only`, wrong for anything that narrows a type. A map holding just the
+few entries `--since` touched is non-empty and still incomplete, so relations pointing at
+untouched entries would have resolved to nothing and been dropped silently. The question is now
+completeness rather than emptiness, and hydration happens once per type instead of per entry.
+
+*Evidence:* on Northfield, `--since 2020-01-01` writes 7 pages instead of 8 — exactly the one
+page last modified in 2019 — while authors, categories, posts and services stay whole. A
+date it cannot parse is refused outright rather than quietly migrating nothing.
+
+*Not yet exercised:* the pass-2 hydration path is covered by unit tests only. Pass 2 does not
+run in a dry run, so confirming it against a live Strapi needs an API token.
 
 ### 3.5 A written plan file — **done**
 
