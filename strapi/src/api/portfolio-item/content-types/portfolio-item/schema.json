@@ -59,6 +59,11 @@
     "wpLink": {
       "type": "string"
     },
+    "results": {
+      "type": "component",
+      "repeatable": false,
+      "component": "groups.portfolio-item-results"
+    },
     "clientName": {
       "type": "string"
     },
@@ -85,15 +90,6 @@
         "videos",
         "audios"
       ]
-    },
-    "resultsHeadline": {
-      "type": "string"
-    },
-    "resultsMetric": {
-      "type": "string"
-    },
-    "resultsSummary": {
-      "type": "string"
     }
   }
 }
