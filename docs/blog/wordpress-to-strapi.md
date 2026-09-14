@@ -18,10 +18,13 @@ A Strapi v5 project containing:
   zone of components when the page was built with a page builder.
 - The media library, uploaded file by file, with alt text and captions.
 - Authors as their own collection, related to the entries they wrote.
+- Your menus, as a `navigation` single type, with each item's link resolved to wherever that
+  content landed in Strapi.
 - Custom fields typed by what they hold: dates as dates, attachment ids as media, post ids as
   relations.
-- `wpId` and `wpLink` on every entry, so a second run updates instead of duplicating, and so
-  you can trace anything back to WordPress.
+- `wpId`, `wpSite` and `wpLink` on every entry, so a second run updates instead of duplicating —
+  even when one Strapi holds migrations from several WordPress sites — and so you can trace
+  anything back to WordPress.
 - `redirects.json` for any URL that had to change, and `migration-report.json` listing every
   entry the tool was unsure about.
 
@@ -111,7 +114,7 @@ This snapshots every post type, taxonomy, author, and media record into
 slow, remote, or switched off on migration day.
 
 The export tells you whether the helper plugin is active and which hidden types it had to
-expose. It also counts comments and exports menus, both of which it will not migrate.
+expose. It also exports your menus, which do get migrated, and counts comments, which do not.
 
 ### 3. Analyze
 
@@ -120,8 +123,11 @@ node analyze.js                # --format markdown to store bodies as Markdown i
 ```
 
 This reads the snapshot and prints a plan: every content type, every field, and the Strapi type
-proposed for it. Judgment calls are marked with `⚑`. It writes `migration.config.json`
-alongside.
+proposed for it. Judgment calls are marked with `⚑`. It writes two files alongside:
+`migration.config.json`, which drives everything downstream, and `migration-plan.md`, the same
+plan as a document — each type with its entry count, a table of every field and what it becomes,
+the custom fields it chose to drop and why. The terminal scrolls away; the document is something
+you can reread, or put in a pull request for someone else to check.
 
 WordPress's fixed fields are mapped by rule: title, body, excerpt, featured image, author,
 taxonomies, parent, dates. Custom fields are guessed from their values, which is where the
@@ -135,8 +141,8 @@ Each line of the plan looks like this:
 
 ### 4. Review the config
 
-This is the gate, and it is the step worth slowing down for. The config is a plain JSON file
-you can read and edit:
+This is the gate, and it is the step worth slowing down for. Read `migration-plan.md` first —
+it is the plan in prose — then edit the config, which is a plain JSON file:
 
 ```json
 {
@@ -201,10 +207,21 @@ node verify.js
 `--dry-run` writes each entry's payload to `wp-export/preview/<type>/<slug>.json` so you can
 read what would be created.
 
+Both commands start with a preflight, which refuses to begin rather than half-migrate. It
+checks the config for relations pointing at types nobody defined, dynamic zones naming
+components that do not exist, and unknown transforms; then it asks Strapi whether it is
+actually serving every type the config expects, which catches the most common mistake of all —
+`generate.js` ran, but Strapi had not reloaded — and whether the token can read them. Every
+problem is reported at once, before anything is written.
+
 The real run happens in two passes. Pass 1 creates every entry with its scalar fields, rich
 text, and media. Pass 2 wires up relations. It has to be two passes, because a relation needs
-the target entry to exist first. Entries are matched on `wpId`, so re-running updates instead
-of duplicating.
+the target entry to exist first. Entries are matched on their WordPress id *and* their source
+site, so re-running updates instead of duplicating, and one Strapi can hold migrations from
+several WordPress sites without one site's post 42 overwriting another's.
+
+Your menus are written after pass 1, once every entry has its new URL, so the navigation points
+at the migrated content rather than back at WordPress.
 
 `verify.js` then compares Strapi against the export: counts per type, entries whose fields
 still contain the old WordPress host, and media fields that had a value in WordPress but are
@@ -424,8 +441,10 @@ Say this part out loud before you promise anyone a date.
   structure.
 - **Comments.** Counted and reported, not migrated. Strapi has no built-in comments. Use a
   plugin, or model a `comment` collection with a relation to the entry.
-- **Menus.** Exported when you are authenticated, then ignored. Model navigation as a single
-  type by hand if you need it.
+- **Menu nesting, as nesting.** Menus themselves do migrate, into a `navigation` single type.
+  But a Strapi component cannot contain itself, so items are a flat list where each one carries
+  the id of its parent, rather than components nested inside components. Any depth survives;
+  your front end does the nesting.
 - **WooCommerce products.** Skipped by default. Prices, variations and stock live in
   WooCommerce's own tables, which means the WooCommerce REST API, not this.
 - **SVG files.** Rejected by Strapi's upload settings unless you allow the type.
