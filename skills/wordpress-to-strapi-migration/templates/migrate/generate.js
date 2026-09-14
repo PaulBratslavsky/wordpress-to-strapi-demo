@@ -39,6 +39,24 @@ const COMPONENTS = {
   ...Object.fromEntries(Object.entries(SECTION_COMPONENTS).map(([uid, entry]) => [uid, entry.schema])),
 };
 
+const snakeAll = (s) => s.replace(/[.-]/g, '_');
+
+/** A component the analyzer derived from the site (an ACF Group, say), as a Strapi schema. */
+function configComponentSchema(uid, def) {
+  return {
+    collectionName: `components_${snakeAll(uid)}s`,
+    info: { displayName: def.displayName || uid.split('.')[1], icon: 'bulletList', description: 'Migrated from WordPress' },
+    options: {},
+    attributes: def.attributes,
+  };
+}
+
+/** The built-in catalogue plus anything the config defines. */
+function allComponents(config) {
+  const fromConfig = Object.entries(config.components ?? {}).map(([uid, def]) => [uid, configComponentSchema(uid, def)]);
+  return { ...COMPONENTS, ...Object.fromEntries(fromConfig) };
+}
+
 export function attribute(field) {
   switch (field.type) {
     case 'dynamiczone':
@@ -81,16 +99,17 @@ function schemaFor(t) {
 function validate(config) {
   const errors = [];
   const types = config.types || {};
+  const components = allComponents(config);
   for (const t of Object.values(types)) {
     if (t.singularName === t.pluralName) errors.push(`${t.singularName}: singularName and pluralName must differ`);
     for (const [name, f] of Object.entries(t.fields)) {
       if (!FIELD_TYPES.has(f.type)) errors.push(`${t.singularName}.${name}: unknown field type "${f.type}"`);
       if (f.type === 'relation' && !types[f.target]) errors.push(`${t.singularName}.${name}: relation target "${f.target}" is not a type in the config`);
-      if (f.type === 'component' && !COMPONENTS[f.component]) errors.push(`${t.singularName}.${name}: component "${f.component}" has no definition in generate.js`);
+      if (f.type === 'component' && !components[f.component]) errors.push(`${t.singularName}.${name}: component "${f.component}" has no definition in generate.js or the config`);
       if (f.type === 'enumeration' && !Array.isArray(f.enum)) errors.push(`${t.singularName}.${name}: enumeration needs an "enum" array`);
       if (f.type === 'dynamiczone') {
         for (const uid of f.components ?? []) {
-          if (!COMPONENTS[uid]) errors.push(`${t.singularName}.${name}: component "${uid}" has no definition in generate.js`);
+          if (!components[uid]) errors.push(`${t.singularName}.${name}: component "${uid}" has no definition in generate.js or the config`);
         }
       }
     }
@@ -175,7 +194,8 @@ function main() {
       console.log(`  = ${t.singularName} exists — skipped (use --force to overwrite)`);
     }
   }
-  for (const uid of componentsInUse(config)) writeComponent(a.out, uid, COMPONENTS[uid]);
+  const components = allComponents(config);
+  for (const uid of componentsInUse(config)) writeComponent(a.out, uid, components[uid]);
 
   console.log(`\nGenerated ${written} content type(s) into ${path.join(a.out, 'src')} (.${ext}).`);
   console.log('`strapi develop` reloads on its own when the files appear — no restart needed. Then run migrate.js.');

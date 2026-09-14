@@ -127,6 +127,18 @@ async function main() {
             }),
         });
       }
+      case 'group': {
+        // An ACF Group, stored flattened as `<group>_<sub>` beside its own key.
+        const container = raw && typeof raw === 'object' ? raw : {};
+        const value = {};
+        for (const [name, sub] of Object.entries(field.group ?? {})) {
+          let v = container[sub.key];
+          if (Array.isArray(v) && v.length === 1) v = v[0];
+          if (v === undefined || v === null || v === '') continue;
+          value[name] = sub.transform === 'number' ? Number(v) : v;
+        }
+        return Object.keys(value).length ? value : undefined;
+      }
       case 'slug':
         return slugs[t.singularName].get(item.id);
       case 'date-gmt': {

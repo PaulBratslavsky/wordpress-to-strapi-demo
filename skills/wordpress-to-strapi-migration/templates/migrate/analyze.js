@@ -119,6 +119,23 @@ export function proposeBodyMode({ items, builderCount, format }) {
   return items > 0 && builderCount / items > 0.5 ? 'dynamic-zone' : 'blocks';
 }
 
+/**
+ * ACF Group fields arrive flattened: the group's own key holds nothing, and its
+ * subfields are stored beside it as `<group>_<sub>`. Spotting that shape lets a
+ * group become one Strapi component instead of a row of loose sibling fields.
+ */
+export function detectFieldGroups(sample) {
+  const keys = Object.keys(sample ?? {}).filter((k) => !k.startsWith('_'));
+  const groups = {};
+  for (const key of keys) {
+    const value = sample[key];
+    if (value !== '' && value !== null && value !== undefined) continue; // a parent holds nothing
+    const subs = keys.filter((k) => k.startsWith(`${key}_`)).map((k) => k.slice(key.length + 1));
+    if (subs.length >= 2) groups[key] = subs;
+  }
+  return groups;
+}
+
 function sameTarget(ids, ctx) {
   const types = new Set(ids.map((id) => ctx.postTypeOf.get(id)));
   return types.size === 1 && !types.has(undefined) ? [...types][0] : null;
@@ -193,6 +210,7 @@ function main() {
     source: { url: site.home, export: exportPath },
     content: { format, shortcodes: 'strip', uploadExternalImages: true, absoluteMediaUrls: true },
     types: {},
+    components: {},
   };
   const flags = [];
   const flag = (msg) => flags.push(msg);
@@ -216,6 +234,40 @@ function main() {
     const handled = new Set();
     for (const [src, get] of sources) {
       const keys = new Set(items.flatMap((e) => Object.keys(get(e) ?? {})));
+
+      // Flattened ACF Groups become a component, so `results_headline` and its
+      // siblings arrive as one `results` object rather than three stray fields.
+      const sample = {};
+      for (const key of keys) sample[key] = items.map((e) => get(e)?.[key]).find((v) => v !== undefined);
+      for (const [parent, subs] of Object.entries(detectFieldGroups(sample))) {
+        const uid = `groups.${t.singularName}-${kebab(parent)}`;
+        const attributes = {};
+        const groupFields = {};
+        for (const sub of subs) {
+          const sourceKey = `${parent}_${sub}`;
+          const guess = infer(sourceKey, items.map((e) => get(e)?.[sourceKey]), ctx);
+          if (guess.skip) continue;
+          const { targetWp, note, transform, from, ...attr } = guess;
+          // Keep component fields simple: relations and rich text inside a
+          // component are a modelling decision, not something to guess at.
+          attributes[camel(sub)] = ['relation', 'blocks', 'richtext'].includes(attr.type) ? { type: 'string' } : attr;
+          groupFields[camel(sub)] = { key: sourceKey, transform: transform ?? 'raw' };
+        }
+        if (Object.keys(attributes).length < 2) continue;
+        handled.add(parent);
+        subs.forEach((sub) => handled.add(`${parent}_${sub}`));
+        config.components[uid] = { displayName: titleCase(parent), attributes };
+        t.fields[camel(parent)] = {
+          type: 'component',
+          component: uid,
+          repeatable: false,
+          from: src,
+          transform: 'group',
+          group: groupFields,
+        };
+        flag(`${t.singularName}.${camel(parent)}: ${subs.length} flattened keys → component ${uid}`);
+      }
+
       for (const key of keys) {
         if (handled.has(key)) continue; // registered meta wins over the raw copy
         handled.add(key);
