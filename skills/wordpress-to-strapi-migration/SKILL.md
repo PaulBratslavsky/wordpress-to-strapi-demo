@@ -170,7 +170,8 @@ host, and finds media fields that had a value in WordPress but are empty in Stra
 | Parent page, parent term | self-relation |
 | `publish` / everything else | published / draft, with the original in `wpStatus` |
 | Permalink | `wpLink`, plus `redirects.json` when the path changes |
-| Comments, menus, WooCommerce products | **not migrated** — reported, not moved |
+| Menus | `navigation` single type — repeatable `navigation.menu`, each with `navigation.link` items whose URLs resolve to the migrated entries |
+| Comments, WooCommerce products | **not migrated** — reported, not moved |
 
 ## Strapi v5 rules the engine bakes in
 

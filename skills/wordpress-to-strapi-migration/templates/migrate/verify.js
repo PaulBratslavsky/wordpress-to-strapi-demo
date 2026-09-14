@@ -66,6 +66,9 @@ async function main() {
   const rows = {};
   let problems = 0;
   for (const t of Object.values(config.types)) {
+    // A single type holds one document with no per-entry counts to compare
+    // against — navigation is reported by migrate.js as it writes it.
+    if (t.kind === 'singleType') continue;
     const items = itemsOf(data, t);
     const byWpId = new Map(items.map((i) => [i.id, i]));
     const mediaFields = Object.entries(t.fields).filter(([, f]) => f.type === 'media');

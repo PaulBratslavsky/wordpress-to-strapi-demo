@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { loadJson, parseArgs, kebab } from './lib/util.js';
-import { SECTION_COMPONENTS } from './lib/components.js';
+import { loadJson, parseArgs, kebab, routeFor } from './lib/util.js';
+import { SECTION_COMPONENTS, NAVIGATION_COMPONENTS } from './lib/components.js';
 
 /**
  * GENERATE — write Strapi v5 content types (and components) from
@@ -37,6 +37,8 @@ const COMPONENTS = {
   },
   // Section components, for types whose bodies migrate into a dynamic zone.
   ...Object.fromEntries(Object.entries(SECTION_COMPONENTS).map(([uid, entry]) => [uid, entry.schema])),
+  // Menu components, for the navigation single type.
+  ...NAVIGATION_COMPONENTS,
 };
 
 const snakeAll = (s) => s.replace(/[.-]/g, '_');
@@ -80,9 +82,9 @@ export function attribute(field) {
   }
 }
 
-function schemaFor(t) {
+export function schemaFor(t) {
   return {
-    kind: 'collectionType',
+    kind: t.kind ?? 'collectionType',
     collectionName: snake(t.pluralName),
     info: {
       singularName: t.singularName,
@@ -153,14 +155,29 @@ function writeComponent(root, uid, def) {
   console.log(`  + component ${uid}`);
 }
 
-/** Every component uid the config needs, from component fields and dynamic zones alike. */
-export function componentsInUse(config) {
+/**
+ * Every component uid the config needs, from component fields and dynamic zones
+ * alike — and, transitively, the components those components hold.
+ *
+ * The nesting matters: `navigation.menu` keeps its items in `navigation.link`,
+ * and writing the menu without the link leaves Strapi unable to load the schema
+ * it just received.
+ */
+export function componentsInUse(config, catalogue = allComponents(config)) {
   const uids = new Set();
+  const add = (uid) => {
+    if (!uid || uids.has(uid)) return;
+    uids.add(uid);
+    for (const attr of Object.values(catalogue[uid]?.attributes ?? {})) {
+      if (attr.type === 'component') add(attr.component);
+      if (attr.type === 'dynamiczone') (attr.components ?? []).forEach(add);
+    }
+  };
   for (const t of Object.values(config.types ?? {})) {
     for (const f of Object.values(t.fields ?? {})) {
-      if (f.type === 'component') uids.add(f.component);
+      if (f.type === 'component') add(f.component);
       if (f.type === 'dynamiczone') {
-        (f.components?.length ? f.components : Object.keys(SECTION_COMPONENTS)).forEach((uid) => uids.add(uid));
+        (f.components?.length ? f.components : Object.keys(SECTION_COMPONENTS)).forEach(add);
       }
     }
   }
@@ -188,7 +205,7 @@ function main() {
   let written = 0;
   for (const t of Object.values(config.types)) {
     if (writeType(a.out, t, ext, a.force)) {
-      console.log(`  + ${t.singularName}  (/api/${t.pluralName})`);
+      console.log(`  + ${t.singularName}  (/api/${routeFor(t)})`);
       written++;
     } else {
       console.log(`  = ${t.singularName} exists — skipped (use --force to overwrite)`);

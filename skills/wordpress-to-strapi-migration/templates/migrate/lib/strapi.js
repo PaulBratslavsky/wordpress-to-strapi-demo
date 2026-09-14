@@ -62,6 +62,16 @@ export class StrapiClient {
   }
 
   /**
+   * Write a single type. Strapi v5 has no separate create for these — one PUT
+   * to the singular route both creates the document and replaces it later, so
+   * re-running a migration overwrites rather than duplicating.
+   */
+  async putSingle(singularApiId, data, { status = 'published' } = {}) {
+    const res = await this.#json(`/api/${singularApiId}?status=${status}`, 'PUT', data);
+    return res.data;
+  }
+
+  /**
    * Find the entry migrated from a given WordPress id. This is what makes the
    * migration idempotent: re-running updates the same record instead of
    * creating a duplicate.

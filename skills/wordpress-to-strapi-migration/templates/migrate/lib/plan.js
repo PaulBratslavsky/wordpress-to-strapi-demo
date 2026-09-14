@@ -8,6 +8,8 @@
  * file they apply to.
  */
 
+import { routeFor } from './util.js';
+
 /** How a field reads in the plan — the same vocabulary the config uses. */
 export function fieldKind(fld) {
   switch (fld.type) {
@@ -27,6 +29,7 @@ export function fieldKind(fld) {
 /** How many entries the export holds for a type. */
 export function entryCount(t, data) {
   const kind = t.source?.kind;
+  if (kind === 'menus') return (data.menus?.menus ?? []).length;
   if (kind === 'users') return (data.users ?? []).length;
   if (kind === 'taxonomy') return (data.terms?.[t.source.slug] ?? []).length;
   return (data.entries?.[t.source?.slug] ?? []).length;
@@ -43,12 +46,14 @@ const fieldSource = (fld) =>
   fld.from == null ? (fld.transform ? `_${fld.transform}_` : '—') : `\`${escape(fld.from)}\``;
 
 function typeSection(t, data) {
-  const src = t.source?.kind === 'users' ? 'users' : `${t.source?.kind} \`${t.source?.slug}\``;
+  // Users and menus have no WordPress slug behind them — naming one would print "undefined".
+  const src = t.source?.slug ? `${t.source.kind} \`${t.source.slug}\`` : (t.source?.kind ?? 'unknown');
   const n = entryCount(t, data);
+  const unit = t.source?.kind === 'menus' ? (n === 1 ? 'menu' : 'menus') : n === 1 ? 'entry' : 'entries';
   const lines = [
-    `### ${t.displayName || t.singularName} — \`/api/${t.pluralName}\``,
+    `### ${t.displayName || t.singularName} — \`/api/${routeFor(t)}\`${t.kind === 'singleType' ? ' _(single type)_' : ''}`,
     '',
-    `Source: ${src} · ${n} ${n === 1 ? 'entry' : 'entries'}${t.bodyMode ? ` · body: **${t.bodyMode}**` : ''}`,
+    `Source: ${src} · ${n} ${unit}${t.bodyMode ? ` · body: **${t.bodyMode}**` : ''}`,
     '',
     '| | Field | From | Strapi type |',
     '|---|---|---|---|',

@@ -1,5 +1,5 @@
 import { writeFileSync } from 'node:fs';
-import { loadJson, parseArgs, kebab, camel, pluralize, slugify, htmlToText } from './lib/util.js';
+import { loadJson, parseArgs, kebab, camel, pluralize, slugify, htmlToText, routeFor } from './lib/util.js';
 import { detectPageBuilder } from './lib/html.js';
 import { MediaLibrary } from './lib/media.js';
 import { planMarkdown } from './lib/plan.js';
@@ -423,21 +423,41 @@ function main() {
   }
 
   if (data.stats?.comments) flag(`${data.stats.comments} comments exist — Strapi has no built-in comments, they are not migrated`);
-  if (data.menus?.menus?.length) flag(`${data.menus.menus.length} menus exported — model navigation as a single type by hand if you need it`);
+  if (data.menus?.menus?.length && !config.types.navigation) {
+    config.types.navigation = {
+      source: { kind: 'menus' },
+      kind: 'singleType',
+      singularName: 'navigation',
+      pluralName: 'navigations',
+      displayName: 'Navigation',
+      urlPattern: null,
+      fields: { menus: { type: 'component', component: 'navigation.menu', repeatable: true } },
+    };
+    const itemCount = data.menus.items?.length ?? 0;
+    flag(`${data.menus.menus.length} menus (${itemCount} items) → a "navigation" single type; links resolve to the migrated entries`);
+  }
   if (!site.authenticated) flag('export was unauthenticated — only published content; custom fields and drafts are missing');
   for (const [slug, why] of Object.entries(data.stats?.skippedTypes || {})) flag(`${slug} not exported: ${why}`);
 
   // --- report -------------------------------------------------------------------
   console.log(`\nMigration plan for ${site.name} (${site.home}) — body format: ${format}\n`);
   for (const t of Object.values(config.types)) {
-    const src = t.source.kind === 'users' ? 'users' : `${t.source.kind} ${t.source.slug}`;
-    const n = t.source.kind === 'users' ? authors.length : t.source.kind === 'taxonomy' ? data.terms[t.source.slug].length : data.entries[t.source.slug].length;
+    const src = t.source.slug ? `${t.source.kind} ${t.source.slug}` : t.source.kind;
+    const n =
+      t.source.kind === 'users'
+        ? authors.length
+        : t.source.kind === 'menus'
+          ? (data.menus?.menus?.length ?? 0)
+          : t.source.kind === 'taxonomy'
+            ? data.terms[t.source.slug].length
+            : data.entries[t.source.slug].length;
     console.log(
-      `■ ${t.displayName}  (${src}, ${n}) → api::${t.singularName}.${t.singularName}  /api/${t.pluralName}${t.bodyMode ? `  [body: ${t.bodyMode}]` : ''}`
+      `■ ${t.displayName}  (${src}, ${n}) → api::${t.singularName}.${t.singularName}  /api/${routeFor(t)}${t.kind === 'singleType' ? ' (single type)' : ''}${t.bodyMode ? `  [body: ${t.bodyMode}]` : ''}`
     );
     for (const [name, fld] of Object.entries(t.fields)) {
       const kind = fld.type === 'relation' ? `relation ${fld.relation} → ${fld.target}` : fld.type === 'media' ? `media${fld.multiple ? ' (multiple)' : ''}` : fld.type === 'component' ? `component ${fld.component}` : fld.type;
-      console.log(`    ${fld.note ? '⚑' : '-'} ${name.padEnd(20)} ← ${String(fld.from).padEnd(34)} ${kind}`);
+      const from = fld.from ?? (fld.transform ? `(${fld.transform})` : '—');
+      console.log(`    ${fld.note ? '⚑' : '-'} ${name.padEnd(20)} ← ${String(from).padEnd(34)} ${kind}`);
     }
     const ign = Object.keys(t.ignoredMeta || {});
     if (ign.length) console.log(`    · ignored ${ign.length} custom field(s): ${ign.slice(0, 8).join(', ')}${ign.length > 8 ? ', …' : ''}`);

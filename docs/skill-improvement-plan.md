@@ -13,10 +13,11 @@ Priorities are ordered by how much they change the quality of a migration, not b
 > and the results in [`migration-findings.md`](migration-findings.md).
 >
 > **Done since:** 1.3's ACF Group → component half, 2.1 (media failures reported rather than
-> fatal), 2.7 (caption URLs counted apart from stale content), 3.1 (`wpSite` namespacing),
-> 3.3 (preflight) and 3.5 (the written plan file), alongside 4.1–4.3.
+> fatal), 2.3 (menus → a navigation single type), 2.7 (caption URLs counted apart from stale
+> content), 3.1 (`wpSite` namespacing), 3.3 (preflight) and 3.5 (the written plan file),
+> alongside 4.1–4.3.
 >
-> **Still open:** 1.3's repeating lists, 1.4, 2.2–2.6, 3.2, 3.4 and 4.4.
+> **Still open:** 1.3's repeating lists, 1.4, 2.2, 2.4–2.6, 3.2, 3.4 and 4.4.
 
 ---
 
@@ -103,11 +104,26 @@ the original URL in place.
 61 `media-player` and 2 `iframe` warnings on Neuros became plain links. With 1.2 in place
 they become `sections.embed`; until then, at least preserve the poster image and title.
 
-### 2.3 Menus → a Navigation single type
+### 2.3 Menus → a Navigation single type — **done**
 
-Menus are exported (2 menus, 11 items on Northfield) and then ignored. Generate a
-`navigation` single type with a repeatable `link` component, resolving each item to the
-migrated entry so links point at real content.
+Menus were exported and then ignored, which left every migrated site without its navigation.
+The analyzer now proposes a `navigation` single type — a repeatable `navigation.menu`, each
+holding repeatable `navigation.link` items — and the migration fills it in after pass 1, when
+every entry's new URL is known, so a menu points at the migrated content rather than at
+WordPress. Verified on Northfield: 2 menus, 11 items, Footer 3 / Main 8.
+
+Two things shaped the model:
+
+- **Items are flat, carrying `parent`** (the WordPress id of the item above, `0` at the top).
+  A Strapi component cannot contain itself, so nesting components would cap menus at whatever
+  depth the schema hard-codes; Northfield's menu is already two deep.
+- **Only internal links are rewritten.** Rewriting resolves against the site URL, so passing
+  an off-site link through it would silently strip the host — the demo's
+  `https://social.example/…` item would have become `/northfield-studio`.
+
+This is the engine's first single type, so `generate.js` learned `kind`, `strapi.js` a
+single-type PUT (idempotent by nature — one document, overwritten), and preflight that a
+single type answers at its singular route. Both collection passes and `verify.js` skip them.
 
 ### 2.4 Comments
 

@@ -20,6 +20,39 @@ const component = (name, icon, attributes) => ({
 
 const media = (multiple = false) => ({ type: 'media', multiple, allowedTypes: ['images', 'files', 'videos', 'audios'] });
 
+const navComponent = (name, icon, attributes) => ({
+  collectionName: `components_navigation_${name.replace(/-/g, '_')}s`,
+  info: { displayName: title(name), icon, description: 'Migrated from WordPress' },
+  options: {},
+  attributes,
+});
+
+/**
+ * WordPress menus, as a `navigation` single type.
+ *
+ * Items are a flat list carrying `parent` rather than components nested inside
+ * components: a Strapi component cannot contain itself, so real menus — which
+ * nest as deep as their author felt like — would otherwise have to be truncated
+ * at whatever depth the schema hard-codes. `parent` holds the WordPress id of
+ * the item above, `0` at the top level, and any depth survives intact.
+ */
+export const NAVIGATION_COMPONENTS = {
+  'navigation.link': navComponent('link', 'link', {
+    label: { type: 'string' },
+    url: { type: 'string' },
+    target: { type: 'string' },
+    order: { type: 'integer' },
+    wpId: { type: 'integer' },
+    parent: { type: 'integer', default: 0 },
+  }),
+  'navigation.menu': navComponent('menu', 'bulletList', {
+    name: { type: 'string' },
+    slug: { type: 'string' },
+    location: { type: 'string' },
+    items: { type: 'component', repeatable: true, component: 'navigation.link' },
+  }),
+};
+
 export const SECTION_COMPONENTS = {
   'sections.rich-text': {
     kinds: ['rich-text'],

@@ -8,7 +8,10 @@
  * front costs one round-trip per type and saves a half-migrated Strapi.
  */
 
-import { SECTION_COMPONENTS } from './components.js';
+import { SECTION_COMPONENTS, NAVIGATION_COMPONENTS } from './components.js';
+import { routeFor } from './util.js';
+
+export { routeFor };
 
 /**
  * The transforms `migrate.js` knows how to apply — every name `analyze.js` emits,
@@ -36,7 +39,11 @@ const TRANSFORMS = new Set([
 ]);
 
 /** Components that exist without the config defining them. */
-const BUILT_IN_COMPONENTS = new Set([...Object.keys(SECTION_COMPONENTS), 'shared.seo']);
+const BUILT_IN_COMPONENTS = new Set([
+  ...Object.keys(SECTION_COMPONENTS),
+  ...Object.keys(NAVIGATION_COMPONENTS),
+  'shared.seo',
+]);
 
 /**
  * Static problems in the config: things that cannot work no matter what Strapi
@@ -83,7 +90,8 @@ export function checkConfig(config) {
 export async function checkStrapi(config, probe) {
   const missing = [];
   for (const t of Object.values(config.types ?? {})) {
-    if ((await probe(t.pluralName)) === 404) missing.push(t.pluralName);
+    const route = routeFor(t);
+    if ((await probe(route)) === 404) missing.push(route);
   }
   return missing;
 }
@@ -112,9 +120,10 @@ export async function preflight(config, strapi) {
   const unauthorized = [];
   const missing = [];
   for (const t of Object.values(config.types ?? {})) {
-    const status = await probe(t.pluralName);
-    if (status === 404) missing.push(t.pluralName);
-    else if (status === 401 || status === 403) unauthorized.push(t.pluralName);
+    const route = routeFor(t);
+    const status = await probe(route);
+    if (status === 404) missing.push(route);
+    else if (status === 401 || status === 403) unauthorized.push(route);
   }
 
   if (missing.length) {

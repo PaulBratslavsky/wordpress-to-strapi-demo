@@ -3,6 +3,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { loadJson, parseArgs, requireEnv, slugify, htmlToText, getPath, asArray } from './lib/util.js';
 import { checkConfig, preflight } from './lib/preflight.js';
+import { buildNavigation } from './lib/navigation.js';
 import { StrapiClient } from './lib/strapi.js';
 import { MediaLibrary } from './lib/media.js';
 import { LinkRewriter } from './lib/links.js';
@@ -56,7 +57,10 @@ async function main() {
     log: console.log,
   });
   const links = new LinkRewriter({ siteUrl });
-  const types = Object.values(config.types);
+  // Single types hold one document each and have no WordPress entries to walk,
+  // so both passes below work on the collections only.
+  const allTypes = Object.values(config.types);
+  const types = allTypes.filter((t) => t.kind !== 'singleType');
   const selected = (t) => !only || only.has(t.singularName);
 
   // Refuse to start on a config that can't work, or a Strapi that hasn't loaded
@@ -302,6 +306,31 @@ async function main() {
       }
     }
     console.log(`  linked ${linked} entries`);
+  }
+
+  // --- Navigation -----------------------------------------------------------------
+  // After pass 1, every entry has a slug registered with the rewriter, so menu
+  // links can resolve to where the content actually landed.
+  const navType = allTypes.find((t) => t.source?.kind === 'menus');
+  if (navType && selected(navType)) {
+    const nav = buildNavigation(data.menus, { links });
+    if (!nav) {
+      console.log('\n■ Navigation — no menus in the export, nothing to write');
+    } else {
+      const itemCount = nav.menus.reduce((n, m) => n + m.items.length, 0);
+      console.log(`\n■ Navigation → /api/${navType.singularName}  (${nav.menus.length} menus, ${itemCount} items)`);
+      for (const m of nav.menus) console.log(`  · ${m.name}${m.location ? ` [${m.location}]` : ''} — ${m.items.length} items`);
+      if (dryRun) {
+        console.log('  (dry run — not written)');
+      } else {
+        try {
+          await strapi.putSingle(navType.singularName, nav);
+        } catch (err) {
+          failures.push({ type: navType.singularName, pass: 'navigation', error: err.message, details: err.details });
+          console.log(`  ✗ ${err.message}`);
+        }
+      }
+    }
   }
 
   // --- Report ---------------------------------------------------------------------

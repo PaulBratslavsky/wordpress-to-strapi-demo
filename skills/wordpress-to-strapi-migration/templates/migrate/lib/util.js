@@ -67,6 +67,13 @@ export const asArray = (v) => (v == null ? [] : Array.isArray(v) ? v : [v]);
  * Minimal argv parser: `--key value` pairs, plus boolean flags listed in `bools`.
  *   parseArgs(process.argv, ['dry-run']) → { export: '...', 'dry-run': true }
  */
+/**
+ * Where a configured type answers. A Strapi single type lives at its singular
+ * route (`/api/navigation`), a collection at the plural one (`/api/posts`), and
+ * several places — preflight, the plan, the analyzer's report — need to agree.
+ */
+export const routeFor = (t) => (t.kind === 'singleType' ? t.singularName : t.pluralName);
+
 export function parseArgs(argv, bools = []) {
   const out = {};
   for (let i = 2; i < argv.length; i++) {
