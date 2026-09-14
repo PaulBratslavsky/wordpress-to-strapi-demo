@@ -10,8 +10,13 @@ Priorities are ordered by how much they change the quality of a migration, not b
 > `bodyMode`, the HTML segmenter, the ten `sections.*` components, and the Elementor widget
 > mapper. See the design at
 > [`superpowers/specs/2026-09-13-migrated-content-structure-design.md`](superpowers/specs/2026-09-13-migrated-content-structure-design.md)
-> and the results in [`migration-findings.md`](migration-findings.md). P1.3 (ACF Group →
-> component) and everything in P2–P4 except `SKILL.md` and the references are still open.
+> and the results in [`migration-findings.md`](migration-findings.md).
+>
+> **Done since:** 1.3's ACF Group → component half, 2.1 (media failures reported rather than
+> fatal), 2.7 (caption URLs counted apart from stale content), 3.1 (`wpSite` namespacing),
+> 3.3 (preflight) and 3.5 (the written plan file), alongside 4.1–4.3.
+>
+> **Still open:** 1.3's repeating lists, 1.4, 2.2–2.6, 3.2, 3.4 and 4.4.
 
 ---
 
@@ -164,11 +169,20 @@ matching them and filling the field in. Re-running against both sites then updat
 flag would matter on a site with thousands of images. The upload cache already survives
 restarts, so this is mostly plumbing.
 
-### 3.3 Preflight checks
+### 3.3 Preflight checks — **done**
 
-Before writing anything: Strapi reachable, token valid and full-access, target types
-present, WordPress reachable and authenticated, helper plugin installed. Fail with one
-clear message instead of a mid-run error.
+`migrate.js` now refuses to start on a config that can't work or a Strapi that isn't ready,
+printing every problem at once instead of failing partway through:
+
+- a relation whose target no type defines,
+- a dynamic zone or component field naming a component that doesn't exist,
+- an unknown `transform` (a typo here used to fail silently),
+- content types Strapi doesn't serve — nearly always `generate.js` ran but Strapi wasn't
+  restarted — named with that fix,
+- a token that can't read them, pointing at Settings → API Tokens → Full access.
+
+`--dry-run` runs the config half only, so it still works without a token. The checks live in
+`lib/preflight.js` and are covered by `test/preflight.test.js`.
 
 *Evidence:* two separate Strapi startup failures cost real time —
 `DATABASE_FILENAME=` empty (SQLite opening a directory) and a TypeScript error in the
@@ -180,10 +194,13 @@ Add `--since <date>` so a second pass only touches entries modified after the fi
 for the real-world pattern of migrating, then catching up on content written during the
 cutover.
 
-### 3.5 A written plan file
+### 3.5 A written plan file — **done**
 
-`analyze.js` prints its plan to the terminal. Also write `migration-plan.md` so the plan can
-be reviewed in a pull request, and so the reviewer's decisions live next to the config.
+`analyze.js` still prints its plan, and now also writes `migration-plan.md` beside the
+config: every type with its source and entry count, a table of each field (what it came
+from, what it becomes), the custom fields it chose not to migrate and why, and the
+decisions worth a second look. The one moment in this pipeline that genuinely needs review
+is no longer terminal scrollback — it's a file that fits in a pull request.
 
 ---
 

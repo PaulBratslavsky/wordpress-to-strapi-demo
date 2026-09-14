@@ -2,6 +2,7 @@ import { writeFileSync } from 'node:fs';
 import { loadJson, parseArgs, kebab, camel, pluralize, slugify, htmlToText } from './lib/util.js';
 import { detectPageBuilder } from './lib/html.js';
 import { MediaLibrary } from './lib/media.js';
+import { planMarkdown } from './lib/plan.js';
 
 /**
  * ANALYZE — read the export, print a migration plan, and write a starter
@@ -448,7 +449,14 @@ function main() {
   }
 
   writeFileSync(outPath, JSON.stringify(config, null, 2) + '\n');
+
+  // The same plan as a document, so it can be reviewed in a pull request
+  // rather than in whatever is left of the terminal scrollback.
+  const planPath = outPath.replace(/[^/\\]+$/, 'migration-plan.md');
+  writeFileSync(planPath, planMarkdown(config, data, flags));
+
   console.log(`\nWrote ${outPath}. Review it (rename types, drop or add fields, set urlPattern), then run generate.js.`);
+  console.log(`Wrote ${planPath} — the same plan, readable and reviewable.`);
 }
 
 // Run only as a CLI: the tests import proposeBodyMode from this file.

@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { loadJson, parseArgs, requireEnv, slugify, htmlToText, getPath, asArray } from './lib/util.js';
+import { checkConfig, preflight } from './lib/preflight.js';
 import { StrapiClient } from './lib/strapi.js';
 import { MediaLibrary } from './lib/media.js';
 import { LinkRewriter } from './lib/links.js';
@@ -57,6 +58,16 @@ async function main() {
   const links = new LinkRewriter({ siteUrl });
   const types = Object.values(config.types);
   const selected = (t) => !only || only.has(t.singularName);
+
+  // Refuse to start on a config that can't work, or a Strapi that hasn't loaded
+  // the generated schemas yet. Half a migration is worse than none.
+  const problems = dryRun ? checkConfig(config) : await preflight(config, strapi);
+  if (problems.length) {
+    console.error('\nPreflight found problems:\n');
+    for (const p of problems) console.error(`  ✗ ${p}`);
+    console.error('');
+    process.exit(1);
+  }
 
   // Final slugs up front: Strapi uids must be ASCII and unique per type, and
   // links/redirects need to know every entry's new URL before any content converts.

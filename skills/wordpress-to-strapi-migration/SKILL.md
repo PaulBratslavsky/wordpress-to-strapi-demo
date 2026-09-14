@@ -104,11 +104,15 @@ node analyze.js                # --format markdown to store bodies as Markdown i
 ```
 
 Prints the plan — every content type, every field's proposed Strapi mapping, and the
-judgment calls marked `⚑` — and writes `migration.config.json`.
+judgment calls marked `⚑` — and writes two files: `migration.config.json`, which drives
+everything downstream, and `migration-plan.md`, the same plan as a document you can read
+after the terminal has scrolled away or put in front of someone in a pull request.
 
 ### 4. Review the config — **the gate**
 
-This is where a human decides. Read the plan and edit `migration.config.json` before
+This is where a human decides. Read `migration-plan.md` — it lists each type with its entry
+count, a table of every field and what it becomes, the custom fields that were dropped and
+why, and the decisions worth a second look — then edit `migration.config.json` before
 generating anything:
 
 - **`bodyMode` per type** — `blocks` for prose (the default), `dynamic-zone` for
@@ -139,6 +143,12 @@ node migrate.js --dry-run     # converts everything, writes previews, touches no
 node migrate.js               # for real; --only post,page and --limit N while iterating
 node verify.js
 ```
+
+Both runs start with preflight, which refuses to begin rather than half-migrate: it catches
+relations pointing at types nobody defined, dynamic zones naming components that don't
+exist, unknown transforms, content types Strapi isn't serving yet (usually `generate.js` ran
+but Strapi hasn't reloaded), and a token without full access. `--dry-run` runs the config
+checks only, so it works without a token.
 
 Pass 1 creates entries with their scalars, rich text and media. Pass 2 wires relations by
 `documentId`. Re-running updates instead of duplicating.
