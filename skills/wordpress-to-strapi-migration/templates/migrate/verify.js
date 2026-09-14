@@ -29,6 +29,19 @@ function stripKeptUrls(value) {
   return value;
 }
 
+/**
+ * Strapi v5 populates a dynamic zone per component, so a plain `populate=*`
+ * leaves `sections` empty — and anything inside it would go unchecked.
+ */
+function populateFor(type) {
+  const params = { populate: '*' };
+  for (const [name, field] of Object.entries(type.fields ?? {})) {
+    if (field.type !== 'dynamiczone') continue;
+    for (const uid of field.components ?? []) params[`populate[${name}][on][${uid}][populate]`] = '*';
+  }
+  return params;
+}
+
 async function main() {
   const args = parseArgs(process.argv);
   const config = loadJson(args.config || 'migration.config.json');
@@ -45,7 +58,7 @@ async function main() {
     let actual = 0;
     let oldHostRefs = 0;
     let missingMedia = 0;
-    for await (const doc of strapi.list(t.pluralName, { populate: '*' })) {
+    for await (const doc of strapi.list(t.pluralName, populateFor(t))) {
       actual++;
       if (JSON.stringify(stripKeptUrls(doc)).includes(`//${oldHost}`)) oldHostRefs++;
       const item = byWpId.get(doc.wpId);

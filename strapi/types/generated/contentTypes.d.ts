@@ -588,7 +588,20 @@ export interface ApiPagePage extends Struct.CollectionTypeSchema {
   };
   attributes: {
     author: Schema.Attribute.Relation<'manyToOne', 'api::author.author'>;
-    content: Schema.Attribute.Blocks;
+    content: Schema.Attribute.DynamicZone<
+      [
+        'sections.rich-text',
+        'sections.image',
+        'sections.gallery',
+        'sections.embed',
+        'sections.table',
+        'sections.code',
+        'sections.quote',
+        'sections.cta',
+        'sections.feature',
+        'sections.hero',
+      ]
+    >;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -674,7 +687,7 @@ export interface ApiPortfolioPortfolio extends Struct.CollectionTypeSchema {
   collectionName: 'portfolios';
   info: {
     description: 'Migrated from WordPress (taxonomy: portfolio)';
-    displayName: 'Category';
+    displayName: 'Portfolio';
     pluralName: 'portfolios';
     singularName: 'portfolio';
   };

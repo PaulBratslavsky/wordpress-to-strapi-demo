@@ -4,7 +4,7 @@
   "info": {
     "singularName": "portfolio",
     "pluralName": "portfolios",
-    "displayName": "Category",
+    "displayName": "Portfolio",
     "description": "Migrated from WordPress (taxonomy: portfolio)"
   },
   "options": {

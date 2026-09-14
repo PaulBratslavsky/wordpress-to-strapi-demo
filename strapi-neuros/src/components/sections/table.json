@@ -1,0 +1,21 @@
+{
+  "collectionName": "components_sections_tables",
+  "info": {
+    "displayName": "Table",
+    "icon": "grid",
+    "description": "Migrated from WordPress"
+  },
+  "options": {},
+  "attributes": {
+    "rows": {
+      "type": "json"
+    },
+    "caption": {
+      "type": "string"
+    },
+    "hasHeader": {
+      "type": "boolean",
+      "default": true
+    }
+  }
+}

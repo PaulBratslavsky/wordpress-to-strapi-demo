@@ -7,6 +7,8 @@ import { MediaLibrary } from './lib/media.js';
 import { LinkRewriter } from './lib/links.js';
 import { MigrationState } from './lib/state.js';
 import { convertContent } from './lib/content.js';
+import { sectionsForEntry } from './lib/sections.js';
+import { sectionsToZone } from './lib/components.js';
 import { itemsOf } from './lib/source.js';
 
 /**
@@ -103,6 +105,27 @@ async function main() {
         });
         warnings.forEach((w) => warn(w.code, w.detail));
         return value ?? undefined;
+      }
+      case 'sections': {
+        // Elementor's own layout when the entry has it, otherwise the body HTML.
+        const { sections, warnings: found, source } = sectionsForEntry(item, {
+          shortcodes: config.content?.shortcodes ?? 'strip',
+        });
+        found.forEach((w) => warn(w.code, w.detail));
+        if (!sections.length) return undefined;
+        warn('sections', `${sections.length} sections from ${source}`);
+        return sectionsToZone(sections, {
+          media,
+          links,
+          warn,
+          convertHtml: (html) =>
+            convertContent(html, {
+              format: 'blocks',
+              media,
+              links,
+              shortcodes: config.content?.shortcodes ?? 'strip',
+            }),
+        });
       }
       case 'slug':
         return slugs[t.singularName].get(item.id);

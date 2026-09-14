@@ -492,7 +492,20 @@ export interface ApiCaseStudyCaseStudy extends Struct.CollectionTypeSchema {
       'manyToMany',
       'api::case-study-tag.case-study-tag'
     >;
-    content: Schema.Attribute.Blocks;
+    content: Schema.Attribute.DynamicZone<
+      [
+        'sections.rich-text',
+        'sections.image',
+        'sections.gallery',
+        'sections.embed',
+        'sections.table',
+        'sections.code',
+        'sections.quote',
+        'sections.cta',
+        'sections.feature',
+        'sections.hero',
+      ]
+    >;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -564,7 +577,20 @@ export interface ApiPagePage extends Struct.CollectionTypeSchema {
   };
   attributes: {
     bodyLinesStatus: Schema.Attribute.String;
-    content: Schema.Attribute.Blocks;
+    content: Schema.Attribute.DynamicZone<
+      [
+        'sections.rich-text',
+        'sections.image',
+        'sections.gallery',
+        'sections.embed',
+        'sections.table',
+        'sections.code',
+        'sections.quote',
+        'sections.cta',
+        'sections.feature',
+        'sections.hero',
+      ]
+    >;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;
@@ -729,7 +755,20 @@ export interface ApiServiceService extends Struct.CollectionTypeSchema {
     draftAndPublish: true;
   };
   attributes: {
-    content: Schema.Attribute.Blocks;
+    content: Schema.Attribute.DynamicZone<
+      [
+        'sections.rich-text',
+        'sections.image',
+        'sections.gallery',
+        'sections.embed',
+        'sections.table',
+        'sections.code',
+        'sections.quote',
+        'sections.cta',
+        'sections.feature',
+        'sections.hero',
+      ]
+    >;
     createdAt: Schema.Attribute.DateTime;
     createdBy: Schema.Attribute.Relation<'oneToOne', 'admin::user'> &
       Schema.Attribute.Private;

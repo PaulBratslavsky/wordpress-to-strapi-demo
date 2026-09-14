@@ -1,0 +1,20 @@
+{
+  "collectionName": "components_sections_embeds",
+  "info": {
+    "displayName": "Embed",
+    "icon": "play",
+    "description": "Migrated from WordPress"
+  },
+  "options": {},
+  "attributes": {
+    "url": {
+      "type": "string"
+    },
+    "provider": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    }
+  }
+}

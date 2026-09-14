@@ -10,6 +10,14 @@
 
 **Spec:** [`docs/superpowers/specs/2026-09-13-migrated-content-structure-design.md`](../specs/2026-09-13-migrated-content-structure-design.md)
 
+> **Executed 2026-09-14.** All seven tasks are done; 17 tests pass (`node --test test/*.test.js`).
+> Three things came out of running it on real sites and are now in the code:
+> a refused upload (Strapi rejects SVG by default) must not fail the whole entry;
+> `string` component fields need clamping to Strapi's 255-character limit;
+> and links inside components need the same rewriting the body HTML gets.
+> The unknown-widget fallback also had to read any prose-looking setting, not a fixed list,
+> which cut skipped Elementor widgets from 441 to 172.
+
 ## Global Constraints
 
 - All engine code lives in `skills/wordpress-to-strapi-migration/templates/migrate/`.

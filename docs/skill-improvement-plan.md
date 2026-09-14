@@ -6,6 +6,13 @@ Findings in [`migration-findings.md`](migration-findings.md).
 
 Priorities are ordered by how much they change the quality of a migration, not by effort.
 
+> **Status, 2026-09-14:** P1.1 and P1.2 are **built and run against both sites** — per-type
+> `bodyMode`, the HTML segmenter, the ten `sections.*` components, and the Elementor widget
+> mapper. See the design at
+> [`superpowers/specs/2026-09-13-migrated-content-structure-design.md`](superpowers/specs/2026-09-13-migrated-content-structure-design.md)
+> and the results in [`migration-findings.md`](migration-findings.md). P1.3 (ACF Group →
+> component) and everything in P2–P4 except `SKILL.md` and the references are still open.
+
 ---
 
 ## P1 — Structure content the way Strapi is meant to be used

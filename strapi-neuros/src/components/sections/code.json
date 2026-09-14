@@ -1,0 +1,17 @@
+{
+  "collectionName": "components_sections_codes",
+  "info": {
+    "displayName": "Code",
+    "icon": "code",
+    "description": "Migrated from WordPress"
+  },
+  "options": {},
+  "attributes": {
+    "code": {
+      "type": "text"
+    },
+    "language": {
+      "type": "string"
+    }
+  }
+}

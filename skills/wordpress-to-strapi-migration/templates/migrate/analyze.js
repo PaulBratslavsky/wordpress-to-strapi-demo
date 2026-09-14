@@ -109,6 +109,16 @@ function infer(key, values, ctx) {
   return { type: 'json', transform: 'raw', note: 'mixed or nested values' };
 }
 
+/**
+ * Which lane a type's bodies belong in. More than half the entries built with a
+ * page builder means the structure is worth keeping, so those go to a dynamic
+ * zone; ordinary prose stays in one Blocks field.
+ */
+export function proposeBodyMode({ items, builderCount, format }) {
+  if (format === 'markdown') return 'markdown';
+  return items > 0 && builderCount / items > 0.5 ? 'dynamic-zone' : 'blocks';
+}
+
 function sameTarget(ids, ctx) {
   const types = new Set(ids.map((id) => ctx.postTypeOf.get(id)));
   return types.size === 1 && !types.has(undefined) ? [...types][0] : null;
@@ -289,10 +299,21 @@ function main() {
     const t = makeType(`postType:${slug}`, { kind: 'postType', slug }, displayName(wpType.labels?.singular_name, slug));
     const has = (fn) => items.some(fn);
     const f = t.fields;
+    const count = (fn) => items.filter(fn).length;
+    const html = (e) => e.content?.rendered || '';
+    const builder = count(
+      (e) => detectPageBuilder(html(e)) || e.migration_meta?._elementor_edit_mode === 'builder' || /^elementor/.test(e.template || '')
+    );
+    t.bodyMode = proposeBodyMode({ items: items.length, builderCount: builder, format });
 
     if (has((e) => htmlToText(e.title?.rendered))) f.title = { type: 'string', from: 'title', transform: 'text' };
     f.slug = { type: 'uid', ...(f.title && { targetField: 'title' }), from: 'slug', transform: 'slug' };
-    if (has((e) => e.content?.rendered?.trim())) f.content = { type: richType, from: 'content', transform: 'content' };
+    if (has((e) => e.content?.rendered?.trim())) {
+      f.content =
+        t.bodyMode === 'dynamic-zone'
+          ? { type: 'dynamiczone', components: [], from: 'content', transform: 'sections' }
+          : { type: richType, from: 'content', transform: 'content' };
+    }
     if (has((e) => htmlToText(e.excerpt?.raw || e.excerpt?.rendered))) f.excerpt = { type: 'text', from: 'excerpt', transform: 'excerpt' };
     if (has((e) => e.featured_media)) f.featuredImage = { type: 'media', multiple: false, from: 'featured_media', transform: 'media' };
     if (names.users && has((e) => e.author)) f.author = { type: 'relation', relation: 'manyToOne', target: names.users, from: 'author' };
@@ -322,10 +343,13 @@ function main() {
     addCustomFields(t, items, t.singularName);
 
     // Content scan: the things that won't survive a straight conversion.
-    const count = (fn) => items.filter(fn).length;
-    const html = (e) => e.content?.rendered || '';
-    const builder = count((e) => detectPageBuilder(html(e)) || e.migration_meta?._elementor_edit_mode === 'builder' || /^elementor/.test(e.template || ''));
-    if (builder) flag(`${t.singularName}: ${builder}/${items.length} entries built with a page builder — layout is flattened to rich text (see references/page-builders.md)`);
+    if (builder) {
+      flag(
+        t.bodyMode === 'dynamic-zone'
+          ? `${t.singularName}: ${builder}/${items.length} entries built with a page builder → their sections become a dynamic zone`
+          : `${t.singularName}: ${builder}/${items.length} entries built with a page builder — layout is flattened to rich text (see references/page-builders.md)`
+      );
+    }
     const embeds = count((e) => /wp-block-embed|<iframe/i.test(html(e)));
     if (embeds) flag(`${t.singularName}: ${embeds} entries contain embeds/iframes → converted to links`);
     const tables = count((e) => /<table/i.test(html(e)));
@@ -352,7 +376,9 @@ function main() {
   for (const t of Object.values(config.types)) {
     const src = t.source.kind === 'users' ? 'users' : `${t.source.kind} ${t.source.slug}`;
     const n = t.source.kind === 'users' ? authors.length : t.source.kind === 'taxonomy' ? data.terms[t.source.slug].length : data.entries[t.source.slug].length;
-    console.log(`■ ${t.displayName}  (${src}, ${n}) → api::${t.singularName}.${t.singularName}  /api/${t.pluralName}`);
+    console.log(
+      `■ ${t.displayName}  (${src}, ${n}) → api::${t.singularName}.${t.singularName}  /api/${t.pluralName}${t.bodyMode ? `  [body: ${t.bodyMode}]` : ''}`
+    );
     for (const [name, fld] of Object.entries(t.fields)) {
       const kind = fld.type === 'relation' ? `relation ${fld.relation} → ${fld.target}` : fld.type === 'media' ? `media${fld.multiple ? ' (multiple)' : ''}` : fld.type === 'component' ? `component ${fld.component}` : fld.type;
       console.log(`    ${fld.note ? '⚑' : '-'} ${name.padEnd(20)} ← ${String(fld.from).padEnd(34)} ${kind}`);
@@ -370,4 +396,5 @@ function main() {
   console.log(`\nWrote ${outPath}. Review it (rename types, drop or add fields, set urlPattern), then run generate.js.`);
 }
 
-main();
+// Run only as a CLI: the tests import proposeBodyMode from this file.
+if (/analyze\.js$/.test(process.argv[1] ?? '')) main();

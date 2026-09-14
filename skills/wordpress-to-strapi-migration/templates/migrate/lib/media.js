@@ -162,7 +162,15 @@ export class MediaLibrary {
     }
 
     const blob = new Blob([bytes], { type: type || 'application/octet-stream' });
-    const file = await this.strapi.upload(blob, src.fileName, { name: src.fileName, ...src.fileInfo });
+    let file;
+    try {
+      file = await this.strapi.upload(blob, src.fileName, { name: src.fileName, ...src.fileInfo });
+    } catch (err) {
+      // Strapi refuses some types outright — SVG unless you allow it in the upload
+      // settings. One rejected file shouldn't take the whole entry down with it.
+      this.log(`  ! Strapi refused ${src.fileName}: ${err.message}`);
+      return null;
+    }
     this.state.media[key] = file;
     this.state.save();
     this.verified.add(file.id);

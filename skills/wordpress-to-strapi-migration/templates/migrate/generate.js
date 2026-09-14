@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { loadJson, parseArgs, kebab } from './lib/util.js';
+import { SECTION_COMPONENTS } from './lib/components.js';
 
 /**
  * GENERATE — write Strapi v5 content types (and components) from
@@ -17,7 +18,7 @@ import { loadJson, parseArgs, kebab } from './lib/util.js';
 const snake = (s) => kebab(s).replace(/-/g, '_');
 const FIELD_TYPES = new Set([
   'string', 'text', 'richtext', 'blocks', 'uid', 'integer', 'biginteger', 'decimal', 'float', 'boolean',
-  'date', 'datetime', 'time', 'email', 'json', 'enumeration', 'media', 'relation', 'component',
+  'date', 'datetime', 'time', 'email', 'json', 'enumeration', 'media', 'relation', 'component', 'dynamiczone',
 ]);
 
 // Components the analyzer can reference.
@@ -34,10 +35,18 @@ const COMPONENTS = {
       ogImage: { type: 'media', multiple: false, allowedTypes: ['images'] },
     },
   },
+  // Section components, for types whose bodies migrate into a dynamic zone.
+  ...Object.fromEntries(Object.entries(SECTION_COMPONENTS).map(([uid, entry]) => [uid, entry.schema])),
 };
 
-function attribute(field) {
+export function attribute(field) {
   switch (field.type) {
+    case 'dynamiczone':
+      // An empty list means "whatever the catalogue offers".
+      return {
+        type: 'dynamiczone',
+        components: field.components?.length ? field.components : Object.keys(SECTION_COMPONENTS),
+      };
     case 'uid':
       return { type: 'uid', ...(field.targetField && { targetField: field.targetField }) };
     case 'media':
@@ -79,6 +88,11 @@ function validate(config) {
       if (f.type === 'relation' && !types[f.target]) errors.push(`${t.singularName}.${name}: relation target "${f.target}" is not a type in the config`);
       if (f.type === 'component' && !COMPONENTS[f.component]) errors.push(`${t.singularName}.${name}: component "${f.component}" has no definition in generate.js`);
       if (f.type === 'enumeration' && !Array.isArray(f.enum)) errors.push(`${t.singularName}.${name}: enumeration needs an "enum" array`);
+      if (f.type === 'dynamiczone') {
+        for (const uid of f.components ?? []) {
+          if (!COMPONENTS[uid]) errors.push(`${t.singularName}.${name}: component "${uid}" has no definition in generate.js`);
+        }
+      }
     }
   }
   return errors;
@@ -120,6 +134,20 @@ function writeComponent(root, uid, def) {
   console.log(`  + component ${uid}`);
 }
 
+/** Every component uid the config needs, from component fields and dynamic zones alike. */
+export function componentsInUse(config) {
+  const uids = new Set();
+  for (const t of Object.values(config.types ?? {})) {
+    for (const f of Object.values(t.fields ?? {})) {
+      if (f.type === 'component') uids.add(f.component);
+      if (f.type === 'dynamiczone') {
+        (f.components?.length ? f.components : Object.keys(SECTION_COMPONENTS)).forEach((uid) => uids.add(uid));
+      }
+    }
+  }
+  return [...uids];
+}
+
 function main() {
   const a = parseArgs(process.argv, ['js', 'force']);
   if (!a.out) {
@@ -147,11 +175,11 @@ function main() {
       console.log(`  = ${t.singularName} exists — skipped (use --force to overwrite)`);
     }
   }
-  const used = new Set(Object.values(config.types).flatMap((t) => Object.values(t.fields).filter((f) => f.type === 'component').map((f) => f.component)));
-  for (const uid of used) writeComponent(a.out, uid, COMPONENTS[uid]);
+  for (const uid of componentsInUse(config)) writeComponent(a.out, uid, COMPONENTS[uid]);
 
   console.log(`\nGenerated ${written} content type(s) into ${path.join(a.out, 'src')} (.${ext}).`);
   console.log('`strapi develop` reloads on its own when the files appear — no restart needed. Then run migrate.js.');
 }
 
-main();
+// Run only as a CLI: the tests import attribute and componentsInUse from this file.
+if (/generate\.js$/.test(process.argv[1] ?? '')) main();

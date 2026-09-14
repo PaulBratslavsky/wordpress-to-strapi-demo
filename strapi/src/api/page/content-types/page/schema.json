@@ -20,7 +20,19 @@
       "targetField": "title"
     },
     "content": {
-      "type": "blocks"
+      "type": "dynamiczone",
+      "components": [
+        "sections.rich-text",
+        "sections.image",
+        "sections.gallery",
+        "sections.embed",
+        "sections.table",
+        "sections.code",
+        "sections.quote",
+        "sections.cta",
+        "sections.feature",
+        "sections.hero"
+      ]
     },
     "excerpt": {
       "type": "text"

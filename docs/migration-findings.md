@@ -304,3 +304,59 @@ One more thing the run made obvious: **Neuros has a single author.** Demo import
 everything to the importing user, so the author relation is real but uninteresting. On a
 genuine client site this is where you'd check that author accounts, not just names, came
 across.
+
+---
+
+## 9. Second pass: page-builder content into dynamic zones
+
+Everything above flattens page-builder pages into one rich-text field. We then built the
+other lane — bodies as a **dynamic zone of components**, read from Elementor's own layout
+data — and ran both sites again.
+
+**The lane is chosen from evidence, per content type.** More than half the entries built with
+a page builder means the structure is worth keeping:
+
+| Site | Blocks | Dynamic zone |
+|---|---|---|
+| Northfield | posts, services, team, testimonials, projects | pages (2 of 8 are Elementor, so we opted in by hand at the review step) |
+| Neuros | posts, projects, team members, vacancies | **pages (22/43), services (21/21), case studies (8/8)** — proposed automatically |
+
+**What came out:**
+
+| | Northfield | Neuros |
+|---|---|---|
+| Entries with a zone | 7 pages | 68 (43 pages, 21 services, 8 case studies) |
+| Sections created | 23 | 913 |
+| Components used | rich-text 11, feature 6, cta 3, hero 1, quote 1, image 1 | rich-text 567, image 317, feature 19, hero 8, quote 2 |
+| Failures | 0 | 0 |
+
+Northfield's home page now arrives as hero → rich text → six features → quote → call to
+action, with the hero image attached and every component link rewritten to a local path
+(`/work/`, `/services/brand-strategy/`, `/contact/`). Both sites verify clean.
+
+### What running it taught us
+
+- **A refused upload must not fail the entry.** Strapi rejects SVG, and in the Blocks lane
+  that was a warning; in the component lane it threw and took 13 whole pages down with it.
+  Uploads now degrade: the image component is dropped, reported as `section-image-dropped`,
+  and the rest of the page migrates.
+- **Component `string` fields are capped at 255 characters.** Page-builder headings blow
+  straight through that. Three pages failed on `content[0].heading must be at most 255
+  characters` before we clamped the heading and moved the overflow into the subheading.
+- **Links inside components need the same rewriting as body HTML.** The first run produced
+  perfectly structured heroes pointing at `http://northfield.local/work/`.
+- **Theme widgets are the real coverage problem.** Neuros's widgets are custom
+  (`neuros_heading`, `neuros_team_members`, `neuros_image_carousel`…), so a fixed list of
+  known widget types skipped 441 of them. Making the fallback read *any* prose-looking
+  setting cut that to 172, and the rest are genuinely structural widgets (team grids, icon
+  lists, carousels that pull from a custom post type) with no text of their own. Those are
+  rebuild candidates, and the report names them with counts.
+
+### The honest summary
+
+For a site whose pages are mostly words, the dynamic zone buys little over Blocks. For a
+theme-built marketing site, it is the difference between a wall of flattened HTML and
+something an editor can work with — but the fidelity you get depends entirely on how many of
+the theme's widgets the mapper knows. Budget time to teach it the ten widgets a given site
+actually uses, and treat carousels and CPT-driven grids as things to rebuild rather than
+migrate.
