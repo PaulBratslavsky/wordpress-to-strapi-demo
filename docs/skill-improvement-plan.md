@@ -15,10 +15,10 @@ Priorities are ordered by how much they change the quality of a migration, not b
 > **Done since:** 1.3's ACF Group → component half, 2.1 (media failures reported rather than
 > fatal), 2.3 (menus → a navigation single type), 2.5 (redirects for slugs that change), 2.7
 > (caption URLs counted apart from stale content), 3.1 (`wpSite` namespacing), 3.3 (preflight),
-> 3.5 (the written plan file), 4.4 (the readable run summary) and 2.6 (refused file types),
-> alongside 4.1–4.3.
+> 3.5 (the written plan file), 4.4 (the readable run summary), 2.6 (refused file types) and
+> 2.4 (what to do about comments), alongside 4.1–4.3.
 >
-> **Still open:** 1.3's repeating lists, 1.4, 2.2, 2.4, 3.2 and 3.4.
+> **Still open:** 1.3's repeating lists, 1.4, 2.2, 3.2 and 3.4.
 
 ---
 
@@ -126,11 +126,13 @@ This is the engine's first single type, so `generate.js` learned `kind`, `strapi
 single-type PUT (idempotent by nature — one document, overwritten), and preflight that a
 single type answers at its singular route. Both collection passes and `verify.js` skip them.
 
-### 2.4 Comments
+### 2.4 Comments — **done**
 
-Not migrated, by design, but the tool should say what the options are (a Strapi comments
-plugin, or a `comment` collection with a relation to the entry) rather than only counting
-them.
+Still not migrated, by design — but the analyzer no longer just counts them. The flag now says
+what the two options are: install a comments plugin, or add a `comment` collection (author,
+email, body, date, approved) with a relation to the entry and move them yourself. The flag
+travels into `migration-plan.md` with the rest of the decisions, which is where someone is
+actually deciding what to do about them.
 
 ### 2.5 Redirects that are actually useful — **done**
 

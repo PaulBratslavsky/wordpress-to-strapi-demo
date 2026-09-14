@@ -422,7 +422,12 @@ function main() {
     if (dupes > 0) flag(`${t.singularName}: ${dupes} duplicate slugs (e.g. same slug under different parents) → suffixed -2, -3`);
   }
 
-  if (data.stats?.comments) flag(`${data.stats.comments} comments exist — Strapi has no built-in comments, they are not migrated`);
+  if (data.stats?.comments)
+    flag(
+      `${data.stats.comments} comments exist and are not migrated — Strapi has none built in. ` +
+        'Either install a comments plugin, or add a "comment" collection (author, email, body, date, ' +
+        'approved) with a relation to the entry and move them yourself.'
+    );
   if (data.menus?.menus?.length && !config.types.navigation) {
     config.types.navigation = {
       source: { kind: 'menus' },
