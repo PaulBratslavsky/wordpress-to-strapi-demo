@@ -30,7 +30,7 @@ anything is generated.
 Proposed rule: prose → `blocks`; a type whose entries are mostly page-builder pages →
 `dynamic-zone`; a type whose bodies are full of tables → `markdown` or `dynamic-zone`.
 
-*Evidence:* on Neuros, 22 of 43 pages, 21 of 21 services and 8 of 8 case studies are
+*Evidence:* on Neuros, 35 of 43 pages, 21 of 21 services and 8 of 8 case studies are
 Elementor-built. On Northfield, 4 entries contain tables that flatten to paragraphs today.
 
 ### 1.2 Elementor → components, from `_elementor_data`
@@ -44,7 +44,7 @@ becomes a component in a dynamic zone; each widget maps to a component by `widge
 | `image` | `sections.image` |
 | `image-box`, `icon-box` | `sections.feature` |
 | `button` | `sections.cta` |
-| `testimonial` | `sections.testimonial` |
+| `testimonial` | `sections.quote` |
 | `video`, embeds | `sections.embed` |
 | anything unrecognised | `sections.rich-text` (its rendered HTML) |
 
@@ -58,12 +58,17 @@ the structure only exists in `_elementor_data`, which the helper plugin already 
 **Status: awaiting sign-off** on the two-lane approach (prose → Blocks, builder pages →
 dynamic zone) before implementation.
 
-### 1.3 ACF Group and repeating lists → components
+### 1.3 ACF Group → component — **done**; repeating lists still open
 
-An ACF Group currently lands as flattened sibling fields (`resultsHeadline`,
-`resultsMetric`, `resultsSummary`). It should become a single-component field. Lists of
-objects (Meta Box's `team_member_experience_list`, ACF repeaters on ACF Pro sites) should
-become repeatable components; the analyzer already flags them with exactly that advice.
+An ACF Group used to land as flattened sibling fields (`resultsHeadline`, `resultsMetric`,
+`resultsSummary`). The analyzer now detects that shape — a parent key holding nothing beside
+`<parent>_<sub>` siblings — defines the component in the config, and the migration assembles
+the nested object. Verified on the demo site: `results: { headline, metric, summary }`.
+
+Still open: **lists of objects** (Meta Box's `team_member_experience_list`, ACF Pro
+repeaters) should become *repeatable* components. The analyzer flags them with that advice
+but still stores them as `json`. Relations and rich text inside a component are coerced to
+strings, deliberately — those are modelling decisions for a human.
 
 ### 1.4 Follow LaunchPad's reusable-section pattern
 
@@ -165,11 +170,11 @@ be reviewed in a pull request, and so the reviewer's decisions live next to the 
 
 ## P4 — Make it a usable skill
 
-### 4.1 `SKILL.md` (blocking)
+### 4.1 `SKILL.md` — **done**
 
-The skill has no `SKILL.md`, so Claude can't load it. It needs: when to trigger, the
-prerequisites, the five steps, the review gate before generating, and the Strapi v5 rules
-the engine depends on.
+Written: when to trigger, the prerequisites, the six steps, the review gate before
+generating, and the Strapi v5 rules the engine depends on. Without it the skill could not
+load at all.
 
 ### 4.2 References
 

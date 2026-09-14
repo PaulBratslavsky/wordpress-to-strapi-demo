@@ -102,8 +102,12 @@ the `_elementor_data` post meta as JSON: sections, columns and widgets with thei
 
 Converting the rendered HTML gives you the words in the right order and throws away the
 layout. That's acceptable for an article; it's poor for a landing page, which is exactly
-where builders are used. On Neuros that's 22 of 43 pages, all 21 services and all 8 case
+where builders are used. On Neuros that's 35 of 43 pages, all 21 services and all 8 case
 studies.
+
+Worth knowing when you count them yourself: 35 pages carry Elementor data
+(`_elementor_data` and `_elementor_edit_mode`), but only 22 show Elementor markup in
+`content.rendered`. Counting the rendered HTML alone under-reports the problem by a third.
 
 `content.raw` is different again: Elementor keeps a plain-HTML fallback there, which is
 usually cleaner than the rendered markup but has no layout either.
@@ -124,7 +128,7 @@ inference has to cope with all of it:
 | `"20240415"` | ACF/Meta Box date picker | `date` (not an integer — check this before the number rule) |
 | `["78","80"]` | ACF relationship | `relation`, resolved through the WordPress IDs |
 | `857` on a key like `hero_image` | attachment ID | `media`, if the ID is in the media library |
-| `results_headline`, `results_metric`, `results_summary` | an **ACF Group**, stored flattened | separate fields today; a component would be better |
+| `results_headline`, `results_metric`, `results_summary` | an **ACF Group**, stored flattened | a Strapi **component**: the analyzer spots the parent-plus-siblings shape and rebuilds the nested object |
 | `["AIX Team"]` | a single value in WordPress's multi-row meta table | unwrapped to `"AIX Team"` |
 | `_reading_time`, `_related_service` | ACF's internal field-key references | ignored |
 
@@ -253,6 +257,12 @@ Neuros post 42 update Northfield post 42. One Strapi per source site avoids that
 key is namespaced (P3.1 in the plan).
 
 343 entries and terms created, 204 media files uploaded, **0 failures**, 156 warnings.
+
+The site has 389 attachments but only 204 files were uploaded, because the migration uploads
+what the content actually references — featured images, images in bodies, media fields — and
+leaves orphaned uploads behind. If you need the whole library, export with `--download-media`
+and import it separately.
+
 Every count matches the export:
 
 ```
@@ -267,7 +277,7 @@ Every count matches the export:
 │ case-study-tag    │ 2         │ 2      │ 0           │ 0            │ '✓' │
 │ post              │ 14        │ 14     │ 0           │ 0            │ '✓' │
 │ page              │ 43        │ 43     │ 12          │ 0            │ '✗' │
-│ project           │ 17        │ 17     │ 5           │ 0            │ '✓/✗' │
+│ project           │ 17        │ 17     │ 5           │ 0            │ '✗' │
 │ team-member       │ 6         │ 6      │ 0           │ 0            │ '✓' │
 │ vacancy           │ 5         │ 5      │ 0           │ 0            │ '✓' │
 │ service           │ 21        │ 21     │ 0           │ 0            │ '✓' │
@@ -319,13 +329,13 @@ a page builder means the structure is worth keeping:
 | Site | Blocks | Dynamic zone |
 |---|---|---|
 | Northfield | posts, services, team, testimonials, projects | pages (2 of 8 are Elementor, so we opted in by hand at the review step) |
-| Neuros | posts, projects, team members, vacancies | **pages (22/43), services (21/21), case studies (8/8)** — proposed automatically |
+| Neuros | posts, projects, team members, vacancies | **pages (35/43), services (21/21), case studies (8/8)** — proposed automatically |
 
 **What came out:**
 
 | | Northfield | Neuros |
 |---|---|---|
-| Entries with a zone | 7 pages | 68 (43 pages, 21 services, 8 case studies) |
+| Entries with a zone | 7 of 8 pages (the Journal page has no body of its own) | 68 (43 pages, 21 services, 8 case studies) |
 | Sections created | 23 | 913 |
 | Components used | rich-text 11, feature 6, cta 3, hero 1, quote 1, image 1 | rich-text 567, image 317, feature 19, hero 8, quote 2 |
 | Failures | 0 | 0 |

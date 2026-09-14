@@ -51,7 +51,7 @@ A free example WordPress site, a Claude Code skill that migrates it to [Strapi](
 
 The skill in [`skills/wordpress-to-strapi-migration/`](skills/wordpress-to-strapi-migration/) reads a site through the [WordPress REST API](https://developer.wordpress.org/rest-api/) and generates matching [Strapi v5](https://docs.strapi.io) content types. It then moves the entries, media and relations into Strapi and reports anything it couldn't convert cleanly.
 
-> **Status:** the migration scripts are written and the content converter is tested, but the skill's instructions and an end-to-end run against the demo site are still in progress.
+> **Status:** run end to end against both example sites. See [what we learned](docs/migration-findings.md) and the [improvement plan](docs/skill-improvement-plan.md) for what's built and what's still open.
 
 Treat it as a starting point. Every WordPress site has its own quirks: page builders, custom fields, plugins. Migration works best as an iterative loop: run the skill, review what it flagged, adjust, and run again.
 

@@ -39,7 +39,7 @@ skill was tested on two sites picked to be opposites.
 | Size | 36 entries, 30 images | 114 entries, 389 images |
 | Content types | 6 (posts, pages, services, projects, team, testimonials) | 7 (posts, pages, services, projects, case studies, team, vacancies) |
 | Custom fields | ACF | Meta Box |
-| Page builder | Elementor on 2 of 8 pages | Elementor on 22 of 43 pages, and on every service and case study |
+| Page builder | Elementor on 2 of 8 pages | Elementor on 35 of 43 pages, and on every service and case study |
 
 Northfield Studio is a fictional design agency, built by a plugin in this repository from free
 plugins and public-domain photos. You can rebuild it in under a minute. It has the hard parts
@@ -300,11 +300,11 @@ Which lane each type got, and what came out:
 | Site | Blocks | Dynamic zone |
 |---|---|---|
 | Northfield | posts, services, team, testimonials, projects | pages (2 of 8 are Elementor, so we opted in by hand at the review step) |
-| Neuros | posts, projects, team members, vacancies | pages (22 of 43), services (21 of 21), case studies (8 of 8), proposed automatically |
+| Neuros | posts, projects, team members, vacancies | pages (35 of 43), services (21 of 21), case studies (8 of 8), proposed automatically |
 
 | | Northfield | Neuros |
 |---|---|---|
-| Entries with a zone | 7 pages | 68 (43 pages, 21 services, 8 case studies) |
+| Entries with a zone | 7 of 8 pages (the Journal page has no body of its own) | 68 (43 pages, 21 services, 8 case studies) |
 | Sections created | 23 | 913 |
 | Components used | rich-text 11, feature 6, cta 3, hero 1, quote 1, image 1 | rich-text 567, image 317, feature 19, hero 8, quote 2 |
 | Failures | 0 | 0 |
@@ -370,22 +370,25 @@ featured image and the sticky flag. The project entries carry the ACF fields the
 hidden: client, year, launch date, hero image, results, and both linked services.
 
 **Neuros.** 13 content types, 343 entries and terms created, 204 media files uploaded, 0
-failures, 156 warnings. Every count matches the export. Eleven of the 13 types verify clean.
-`verify.js` flagged 12 pages and 5 projects for still containing the old WordPress host. Those
-17 entries are two specific problems, both worth knowing before you run a real migration:
+failures, 156 warnings. Every count matches the export. Twelve of the 13 types verify clean.
+On the first run `verify.js` flagged 12 pages and 5 projects for still containing the old
+WordPress host. Two specific problems, both worth knowing before you run a real migration:
 
 1. **Strapi rejects SVG uploads by default.** Every attempt to upload the theme's logos
    returned `File type 'image/svg+xml' is not allowed`, so 13 images stayed as WordPress URLs
-   inside 12 pages. The new site would load its own logo from the old CMS. Allow the type in
-   Strapi's upload settings, or convert the files, before migrating a theme that uses SVG.
+   inside 12 pages. The new site would have loaded its own logo from the old CMS. Allow the
+   type in Strapi's upload settings, or convert the files, before migrating a theme that uses
+   SVG. The migration now drops a refused image and reports it as `section-image-dropped`
+   instead of leaving the old URL behind, which is why those pages verify clean in the second
+   run further down.
 2. **A custom field holding a media URL stays a string.** Meta Box's `project_audio_file`
    points at an MP3 in `wp-content/uploads`. It migrated as text, so five projects still
-   reference the old server.
+   reference the old server. That one is still open.
 
 Neither is a failure of the content model. Every entry, term, relation and featured image
 arrived. Both are the kind of thing that only shows up when you check.
 
-The other warnings from that run:
+The other warnings from that first run, with every body going into a Blocks field:
 
 | Warning | Count | What happened |
 |---|---|---|
