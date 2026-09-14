@@ -15,9 +15,10 @@ Priorities are ordered by how much they change the quality of a migration, not b
 > **Done since:** 1.3's ACF Group → component half, 2.1 (media failures reported rather than
 > fatal), 2.3 (menus → a navigation single type), 2.5 (redirects for slugs that change), 2.7
 > (caption URLs counted apart from stale content), 3.1 (`wpSite` namespacing), 3.3 (preflight),
-> 3.5 (the written plan file) and 4.4 (the readable run summary), alongside 4.1–4.3.
+> 3.5 (the written plan file), 4.4 (the readable run summary) and 2.6 (refused file types),
+> alongside 4.1–4.3.
 >
-> **Still open:** 1.3's repeating lists, 1.4, 2.2, 2.4, 2.6, 3.2 and 3.4.
+> **Still open:** 1.3's repeating lists, 1.4, 2.2, 2.4, 3.2 and 3.4.
 
 ---
 
@@ -152,15 +153,22 @@ page, a draft whose permalink is `?page_id=12`, so it has no public URL to redir
 Zero redirects is the correct output for both. A site with accented or colliding published
 slugs would be the real test.
 
-### 2.6 File types Strapi rejects
+### 2.6 File types Strapi rejects — **done**
 
-Strapi refuses SVG uploads by default (`File type 'image/svg+xml' is not allowed`). Every
-theme logo on Neuros hit this, so 13 images stayed as WordPress URLs in migrated bodies —
-the site's own logo now loads from the old CMS. The migration should detect the rejection,
-say so once with the fix (allow the type in Strapi's upload settings, or convert to PNG),
-and offer `--skip-types svg` rather than failing per image.
+Strapi refuses SVG uploads by default (`File type 'image/svg+xml' is not allowed`). Every theme
+logo on Neuros hit this, and the run repeated Strapi's message once per file — which says
+nothing new the second time, and never says what to do about it.
 
-*Evidence:* `image-failed ×13` on Neuros, all `.svg`, across pages that share a logo.
+Now the rejection is recognised and the remedy given **once per type**, naming the type and the
+three ways out: allow it in Settings → Media Library → Upload, convert the files, or re-run with
+`--skip-types svg`. That flag gives up on a type before spending a download on it, and is checked
+ahead of the dry-run stand-in so a dry run reports what a real one would skip. Every file is
+still recorded individually, and `migration-summary.md` groups them by reason, so one refused
+type reads as one problem with a count rather than as many.
+
+*Evidence:* driven over the real Neuros export (18 SVGs among 389 files) with a Strapi that
+refuses them: 18 failures recorded, **1** advice line rather than 18, and with `--skip-types svg`
+the same 18 recorded for **0** downloads instead of 18 wasted ones.
 
 ### 2.7 Old URLs inside media captions and alt text — **done**
 

@@ -30,6 +30,14 @@ export function urlKey(url, base) {
   }
 }
 
+/** "svg", ".SVG", "svg, pdf" and ["svg"] all mean the same thing here. */
+const extList = (value) =>
+  (Array.isArray(value) ? value : String(value ?? '').split(','))
+    .map((s) => String(s).trim().toLowerCase().replace(/^\./, ''))
+    .filter(Boolean);
+
+const extOf = (name) => (name.includes('.') ? name.split('.').pop().toLowerCase() : '');
+
 const fileNameOf = (url) => {
   try {
     return decodeURIComponent(path.basename(new URL(url).pathname)) || 'file';
@@ -39,14 +47,18 @@ const fileNameOf = (url) => {
 };
 
 export class MediaLibrary {
-  constructor({ items = [], strapi, state, siteUrl, strapiUrl, exportDir = '.', dryRun = false, uploadExternal = true, log = () => {} }) {
+  constructor({ items = [], strapi, state, siteUrl, strapiUrl, exportDir = '.', dryRun = false, uploadExternal = true, skipTypes = [], log = () => {} }) {
     Object.assign(this, { strapi, state, siteUrl, strapiUrl, exportDir, dryRun, uploadExternal, log });
+    // Types to give up on before spending a download on them (--skip-types svg).
+    this.skipTypes = new Set(extList(skipTypes));
     this.byId = new Map(items.map((m) => [m.id, m]));
     this.byPath = new Map();
     this.verified = new Set();
     // Files that couldn't be fetched or that Strapi refused, for the run report.
     this.failures = [];
     this.failed = new Set();
+    // Remedies already given, so a refused type is explained once rather than per file.
+    this.advised = new Set();
     for (const m of items) {
       const add = (u) => {
         const k = u && urlKey(u, siteUrl);
@@ -78,6 +90,22 @@ export class MediaLibrary {
     this.failed.add(key);
     this.failures.push({ url, reason: String(reason).slice(0, 200) });
     return null;
+  }
+
+  /**
+   * Strapi refuses some types outright — SVG unless you allow it in the upload
+   * settings. Its message is the same for every file, and repeating it says
+   * nothing new the second time, so the remedy is given once per type.
+   */
+  adviseOnRefusal(message, ext) {
+    const mime = String(message).match(/File type '([^']+)' is not allowed/i)?.[1];
+    if (!mime || this.advised.has(mime)) return;
+    this.advised.add(mime);
+    const skip = ext ? `, or re-run with --skip-types ${ext}` : '';
+    this.log(
+      `  ! ${mime} is refused by Strapi's upload settings. Allow the type there ` +
+        `(Settings → Media Library → Upload), convert the files${skip}.`
+    );
   }
 
   /** Absolute URL for a Strapi file (the local upload provider returns "/uploads/..."). */
@@ -132,6 +160,12 @@ export class MediaLibrary {
   }
 
   async #put(key, src) {
+    // Checked before the dry-run stand-in, so a dry run reports what a real one would skip.
+    const ext = extOf(src.fileName || '');
+    if (ext && this.skipTypes.has(ext)) {
+      return this.recordFailure(key, src.url, `skipped (--skip-types ${ext})`);
+    }
+
     if (this.dryRun) {
       // No uploads in a dry run: hand back a stand-in so conversion can proceed.
       return {
@@ -177,9 +211,9 @@ export class MediaLibrary {
     try {
       file = await this.strapi.upload(blob, src.fileName, { name: src.fileName, ...src.fileInfo });
     } catch (err) {
-      // Strapi refuses some types outright — SVG unless you allow it in the upload
-      // settings. One rejected file shouldn't take the whole entry down with it.
+      // One rejected file shouldn't take the whole entry down with it.
       this.log(`  ! Strapi refused ${src.fileName}: ${err.message}`);
+      this.adviseOnRefusal(err.message, ext);
       return this.recordFailure(key, src.url, err.message);
     }
     this.state.media[key] = file;

@@ -72,6 +72,19 @@ test('lists files that could not be migrated, with the reason', () => {
   assert.match(md, /not allowed/);
 });
 
+/** 18 refused SVGs should read as one problem with 18 files, not 18 problems. */
+test('states a repeated media failure once, with a count', () => {
+  const md = summaryMarkdown({
+    ...report,
+    media: Array.from({ length: 18 }, (_, i) => ({
+      url: `http://demo.local/logo-${i}.svg`,
+      reason: "File type 'image/svg+xml' is not allowed",
+    })),
+  });
+  assert.match(md, /18/);
+  assert.equal((md.match(/is not allowed/g) || []).length, 1, 'the reason is stated once, not eighteen times');
+});
+
 test('a clean run says so instead of leaving empty sections', () => {
   const md = summaryMarkdown({
     finishedAt: '2026-09-14T20:36:25.715Z',

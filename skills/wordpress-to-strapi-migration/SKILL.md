@@ -140,7 +140,7 @@ itself — don't restart the user's server; wait for the reload and poll `/api/<
 
 ```bash
 node migrate.js --dry-run     # converts everything, writes previews, touches nothing
-node migrate.js               # for real; --only post,page and --limit N while iterating
+node migrate.js               # for real; --only post,page, --limit N, --skip-types svg
 node verify.js
 ```
 
@@ -160,6 +160,11 @@ Every run writes `migration-report.json` (everything, for grepping) and `migrati
 (the same run for a person): what moved, what failed with the id and slug of each entry, files
 that could not be migrated, and the warnings grouped by kind — each explained in a sentence and
 listing the entries behind it. Read the summary, then go look at what it names.
+
+Strapi refuses some file types outright (SVG, unless you allow it in Settings → Media Library →
+Upload). The migration says so once, naming the type and the fix, and keeps going — one refused
+file never takes an entry down with it. `--skip-types svg` gives up on a type before spending a
+download on it.
 
 ## What maps to what
 

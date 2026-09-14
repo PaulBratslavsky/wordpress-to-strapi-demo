@@ -74,13 +74,25 @@ function mediaSection(media) {
   const lines = [
     `## Files that could not be migrated (${media.length})`,
     '',
-    'Each is named once with the reason. Anything using them kept working — the migration drops',
-    'the reference rather than leaving a WordPress URL in your new site.',
+    'Grouped by reason, because one refused type usually means many files. Anything referencing',
+    'them kept working — the migration drops the reference rather than leaving a WordPress URL',
+    'in your new site.',
     '',
   ];
-  for (const f of media.slice(0, LIST_CAP)) lines.push(`- \`${f.url}\` — ${f.reason}`);
-  if (media.length > LIST_CAP) lines.push(`- … and ${media.length - LIST_CAP} more`);
-  lines.push('');
+
+  for (const [reason, files] of groupBy(media, 'reason')) {
+    lines.push(`### ${files.length} ${files.length === 1 ? 'file' : 'files'} — ${reason}`, '');
+    if (/is not allowed/i.test(reason)) {
+      lines.push(
+        "Allow the type in Strapi's upload settings (Settings → Media Library → Upload), convert the",
+        'files, or re-run with `--skip-types` to stop attempting them.',
+        ''
+      );
+    }
+    for (const f of files.slice(0, LIST_CAP)) lines.push(`- \`${f.url}\``);
+    if (files.length > LIST_CAP) lines.push(`- … and ${files.length - LIST_CAP} more`);
+    lines.push('');
+  }
   return lines;
 }
 

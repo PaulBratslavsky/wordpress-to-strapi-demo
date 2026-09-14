@@ -39,6 +39,8 @@ async function main() {
   const dryRun = Boolean(args['dry-run']);
   const only = args.only ? new Set(args.only.split(',').map((s) => s.trim())) : null;
   const limit = args.limit ? Number(args.limit) : Infinity;
+  // e.g. --skip-types svg — file types Strapi refuses, not worth attempting.
+  const skipTypes = args['skip-types'] ?? '';
 
   const siteUrl = data.site.home;
   const strapiUrl = (process.env.STRAPI_URL || 'http://localhost:1337').replace(/\/$/, '');
@@ -55,6 +57,7 @@ async function main() {
     exportDir,
     dryRun,
     uploadExternal: config.content?.uploadExternalImages !== false,
+    skipTypes,
     log: console.log,
   });
   const links = new LinkRewriter({ siteUrl });

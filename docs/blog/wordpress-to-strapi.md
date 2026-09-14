@@ -406,7 +406,9 @@ WordPress host. Two specific problems, both worth knowing before you run a real 
    type in Strapi's upload settings, or convert the files, before migrating a theme that uses
    SVG. The migration now drops a refused image and reports it as `section-image-dropped`
    instead of leaving the old URL behind, which is why those pages verify clean in the second
-   run further down.
+   run further down. It also names the refused type once with the fix rather than repeating
+   Strapi's message per file, and `--skip-types svg` gives up on the type before spending a
+   download on it — on this export that is 18 SVGs attempted, or none.
 2. **A media caption that quotes the old URL looks like a leftover.** Five projects were
    flagged for containing the WordPress host. The file had migrated fine: the field holds an
    attachment id, it became a media field, and the MP3 is in the Strapi library. The old URL
@@ -456,7 +458,9 @@ Say this part out loud before you promise anyone a date.
   your front end does the nesting.
 - **WooCommerce products.** Skipped by default. Prices, variations and stock live in
   WooCommerce's own tables, which means the WooCommerce REST API, not this.
-- **SVG files.** Rejected by Strapi's upload settings unless you allow the type.
+- **SVG files.** Rejected by Strapi's upload settings unless you allow the type. The migration
+  now says so once — naming the type and the three ways out — instead of repeating Strapi's
+  message per file, and `--skip-types svg` stops it attempting them at all.
 - **Theme widgets with no text of their own.** On Neuros, a fixed list of known Elementor
   widgets skipped 441 of them. Making the fallback read any prose-looking setting cut that to
   172. The rest are genuinely structural: team grids, icon lists, carousels that pull from a
