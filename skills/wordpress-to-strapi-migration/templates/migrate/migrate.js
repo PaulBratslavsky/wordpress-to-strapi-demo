@@ -4,6 +4,7 @@ import path from 'node:path';
 import { loadJson, parseArgs, requireEnv, slugify, htmlToText, getPath, asArray } from './lib/util.js';
 import { checkConfig, preflight } from './lib/preflight.js';
 import { buildNavigation } from './lib/navigation.js';
+import { summaryMarkdown } from './lib/summary.js';
 import { StrapiClient } from './lib/strapi.js';
 import { MediaLibrary } from './lib/media.js';
 import { LinkRewriter } from './lib/links.js';
@@ -311,6 +312,7 @@ async function main() {
   // --- Navigation -----------------------------------------------------------------
   // After pass 1, every entry has a slug registered with the rewriter, so menu
   // links can resolve to where the content actually landed.
+  let navigation = null;
   const navType = allTypes.find((t) => t.source?.kind === 'menus');
   if (navType && selected(navType)) {
     const nav = buildNavigation(data.menus, { links });
@@ -318,6 +320,7 @@ async function main() {
       console.log('\n■ Navigation — no menus in the export, nothing to write');
     } else {
       const itemCount = nav.menus.reduce((n, m) => n + m.items.length, 0);
+      navigation = { menus: nav.menus.length, items: itemCount };
       console.log(`\n■ Navigation → /api/${navType.singularName}  (${nav.menus.length} menus, ${itemCount} items)`);
       for (const m of nav.menus) console.log(`  · ${m.name}${m.location ? ` [${m.location}]` : ''} — ${m.items.length} items`);
       if (dryRun) {
@@ -335,14 +338,10 @@ async function main() {
 
   // --- Report ---------------------------------------------------------------------
   writeFileSync('redirects.json', JSON.stringify(links.redirects, null, 2) + '\n');
-  writeFileSync(
-    'migration-report.json',
-    JSON.stringify(
-      { finishedAt: new Date().toISOString(), dryRun, counts, failures, media: media.failures, warnings },
-      null,
-      2
-    ) + '\n'
-  );
+  const report = { finishedAt: new Date().toISOString(), dryRun, counts, navigation, failures, media: media.failures, warnings };
+  writeFileSync('migration-report.json', JSON.stringify(report, null, 2) + '\n');
+  // The same run, written for a person rather than for grep.
+  writeFileSync('migration-summary.md', summaryMarkdown(report));
 
   console.log(`\n${dryRun ? 'Dry run' : 'Migration'} complete.`);
   console.table(counts);

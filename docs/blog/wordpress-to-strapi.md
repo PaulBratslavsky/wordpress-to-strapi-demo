@@ -25,8 +25,8 @@ A Strapi v5 project containing:
 - `wpId`, `wpSite` and `wpLink` on every entry, so a second run updates instead of duplicating —
   even when one Strapi holds migrations from several WordPress sites — and so you can trace
   anything back to WordPress.
-- `redirects.json` for any URL that had to change, and `migration-report.json` listing every
-  entry the tool was unsure about.
+- `redirects.json` for any URL that had to change, `migration-report.json` listing every entry
+  the tool was unsure about, and `migration-summary.md` saying the same thing in words.
 
 Drafts stay drafts. Scheduled and private posts arrive as drafts with their original WordPress
 status kept in a `wpStatus` field.
@@ -229,6 +229,12 @@ at the migrated content rather than back at WordPress.
 `verify.js` then compares Strapi against the export: counts per type, entries whose fields
 still contain the old WordPress host, and media fields that had a value in WordPress but are
 empty in Strapi. It exits non-zero on any mismatch.
+
+The run also writes `migration-summary.md`, which is the one to read first. It says what moved,
+what failed and where, and groups every warning by kind with a sentence explaining what that
+kind means — `table-flattened ×4` is only useful if you already know what it implies — then
+names the entries behind each one. The JSON report keeps everything; the summary tells you
+where to look.
 
 ## The trap that costs you half the site
 

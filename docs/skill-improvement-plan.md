@@ -14,10 +14,10 @@ Priorities are ordered by how much they change the quality of a migration, not b
 >
 > **Done since:** 1.3's ACF Group → component half, 2.1 (media failures reported rather than
 > fatal), 2.3 (menus → a navigation single type), 2.5 (redirects for slugs that change), 2.7
-> (caption URLs counted apart from stale content), 3.1 (`wpSite` namespacing), 3.3 (preflight)
-> and 3.5 (the written plan file), alongside 4.1–4.3.
+> (caption URLs counted apart from stale content), 3.1 (`wpSite` namespacing), 3.3 (preflight),
+> 3.5 (the written plan file) and 4.4 (the readable run summary), alongside 4.1–4.3.
 >
-> **Still open:** 1.3's repeating lists, 1.4, 2.2, 2.4, 2.6, 3.2, 3.4 and 4.4.
+> **Still open:** 1.3's repeating lists, 1.4, 2.2, 2.4, 2.6, 3.2 and 3.4.
 
 ---
 
@@ -258,10 +258,26 @@ Fixture-based tests for the converter: HTML in, Blocks out, validated against St
 lazy-loaded images, `[caption]`, galleries, tables). A recorded export from the demo site
 makes the whole pipeline testable without WordPress running.
 
-### 4.4 Reporting
+### 4.4 Reporting — **done**
 
-`migration-report.json` is complete but unreadable at a glance. Emit a short Markdown
-summary: what moved, what was flagged, and the exact entries a human should look at.
+`migration-report.json` is complete and communicates nothing. Every run now also writes
+`migration-summary.md`, which answers the three questions anyone actually has afterwards: what
+moved (a table of types and counts, plus the menus, which are not entries but did move), what
+failed (each entry with its id, slug, pass and error), and what was flagged.
+
+The flagged section is the point. Warnings are grouped by code, counted, and — this is the part
+the JSON cannot do — **said in words**: `table-flattened ×4` only means something to someone who
+already knows, so each of the twenty codes the engine can emit carries a sentence explaining what
+happened and what to do about it. An unrecognised code is still listed with its entries, because a
+warning nobody explained is still worth seeing. Each group then names the specific entries, which
+is what turns a report into a to-do list.
+
+*Evidence:* rendered from the Northfield run — 68 entries across 12 types, navigation 2 menus /
+11 items, 16 warnings across six codes, each naming the posts and pages to look at.
+
+Still open, and visible in that output: `table` and `table-flattened` fire on the same four
+entries, so the reader is told one fact twice. The fix belongs in the converter, which emits both,
+not in the summary that faithfully reports them.
 
 ---
 

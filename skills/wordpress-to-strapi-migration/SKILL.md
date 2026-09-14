@@ -156,6 +156,11 @@ Pass 1 creates entries with their scalars, rich text and media. Pass 2 wires rel
 `verify.js` compares counts per type, finds entries that still contain the old WordPress
 host, and finds media fields that had a value in WordPress but are empty in Strapi.
 
+Every run writes `migration-report.json` (everything, for grepping) and `migration-summary.md`
+(the same run for a person): what moved, what failed with the id and slug of each entry, files
+that could not be migrated, and the warnings grouped by kind — each explained in a sentence and
+listing the entries behind it. Read the summary, then go look at what it names.
+
 ## What maps to what
 
 | WordPress | Strapi |
