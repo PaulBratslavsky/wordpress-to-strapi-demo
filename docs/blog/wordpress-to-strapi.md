@@ -4,11 +4,14 @@
 
 - A Claude Code skill reads your WordPress site through its REST API, works out matching Strapi
   v5 content types, and writes a migration you review before anything moves.
+- Most of the work happens before you run anything. Decide what you are not moving, settle what
+  your URLs will be, and pick what you want to fix in the model while fixing it is still a line
+  in a config file.
 - The hard part is not moving the data. It is deciding which fields are content and which are
   theme settings, and which pages are structured enough to be worth keeping as structure.
-- The biggest risk is invisible. WordPress hides post types and custom fields from its own REST
-  API unless somebody switched them on. A migration can finish with no errors and still leave
-  half your site behind.
+- One failure mode is silent, so check for it first. WordPress hides post types and custom fields
+  from its own REST API unless somebody switched them on, which means a migration can finish with
+  no errors and still be missing half your content.
 - Practise on a throwaway site first. This repo builds one for you in about a minute, with the
   hard parts already in it.
 - We ran the skill against two real sites, one built for this repo and one commercial theme's
@@ -66,8 +69,17 @@ all. If they move to `/blog/our-kitchen/` you need one for every post. That choi
 to reverse once the new site is live and indexed.
 
 **Remember Strapi is half the job.** It holds your content and serves it over an API. It does not
-render your site. Moving the content and building the front end are two separate pieces of work,
-and the second is usually the larger one.
+render your site, so you still need a front end.
+
+That used to be the larger half of the project. It is less so now, and for a reason that comes
+straight out of the migration: you finish it holding a defined content model. Every type, every
+field, every relation is declared, which is the thing a front end needs to know. Claude can read
+those content types and build pages against them, and Strapi ships an MCP server, so an AI client
+can query your real content while you work rather than guessing at the shape of it. Point it at
+`/mcp` with an admin token and the tools are generated from your own schema.
+
+Plan for it as a second piece of work. Just do not price it the way you would have three years
+ago.
 
 **Involve whoever edits the site.** The content model you end up with is what they will use every
 day. A field called `field2`, or a page that arrives as one undifferentiated block of rich text,
@@ -148,6 +160,22 @@ On the two sites we tested:
   the REST API. So is every Meta Box field.
 - **Northfield**, built from free plugins: the Team post type is hidden, and the projects' ACF
   field group has *Show in REST API* switched off. That is ACF's default setting.
+
+In the demo site that setting is one argument, because the plugin registers its field groups in
+code. Four groups pass `true`. One passes `false`:
+
+```php
+northfield_acf_group(
+    'projects',
+    'Project details',
+    'portfolio_item',
+    false,            // Show in REST API. This is the whole trap.
+    array( /* client, year, launch date, hero image, results ... */ )
+);
+```
+
+On a real site nobody writes that line. Somebody creates a field group in the ACF admin, leaves
+the REST toggle where it was, and the effect is identical.
 
 Here is what those hidden fields look like when they are working:
 
@@ -521,6 +549,8 @@ the demo site, the skill, the engine, and the full notes from both runs.
 - The demo site, the skill and both migration runs: https://github.com/PaulBratslavsky/wordpress-to-strapi-demo
 - Strapi 5 documentation: https://docs.strapi.io
 - Strapi LaunchPad, the reference project for the relation pattern: https://github.com/strapi/LaunchPad
+- Strapi's MCP server, for querying your migrated content from an AI client: https://docs.strapi.io/cms/features/strapi-mcp-server
+- Using Claude Code with Strapi over MCP: https://strapi.io/blog/claude-code-strapi-mcp-ai-content-workflows
 - WordPress REST API Handbook: https://developer.wordpress.org/rest-api/
 - register_post_type and show_in_rest: https://developer.wordpress.org/reference/functions/register_post_type/
 - register_post_meta: https://developer.wordpress.org/reference/functions/register_post_meta/
