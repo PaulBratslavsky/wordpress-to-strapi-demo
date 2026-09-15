@@ -266,11 +266,29 @@ got through before we stopped. The lookup now falls back to entries whose `wpSit
 matching them and filling the field in. Re-running against both sites then updated all 36 and
 343 entries in place, with nothing duplicated.
 
-### 3.2 Parallel uploads and resume
+### 3.2 Parallel uploads and resume — **built, not yet measured**
 
-204 media uploads ran sequentially on Neuros. A small concurrency limit (4–6) and a resume
-flag would matter on a site with thousands of images. The upload cache already survives
-restarts, so this is mostly plumbing.
+204 media uploads ran sequentially on Neuros, because entries migrate one at a time and each
+entry waits for its own files. Pass 1 now runs entries through a small pool (`--concurrency`,
+default 4; `--concurrency 1` is the old strictly-sequential behaviour), so the waiting overlaps.
+
+Concurrency turned out not to be "mostly plumbing". It exposed a correctness problem first:
+`MediaLibrary` checks its upload cache when a call starts, so two entries sharing an
+attachment — a logo, a common hero — would both miss, both download and both upload it. A test
+written before the change confirmed the duplicate rather than assuming it. Concurrent callers
+for the same file now share one upload through an in-flight map.
+
+Resume needs nothing new: the upload cache in `.migration-state.json` already survives
+restarts, so an interrupted run re-uses what it already moved.
+
+*Verified so far:* 13 unit tests covering the pool (order preserved, the limit respected, a
+failure surfacing without stalling or starting new work) and the shared-upload dedupe. On
+Northfield, `--concurrency 1` and `--concurrency 4` produce identical results: 12 types, 68
+entries, 0 failures, 16 warnings.
+
+*Not yet verified:* that it is actually faster. A dry run makes no network calls, so the only
+honest measurement is a real run against a live Strapi — which needs an API token. Until then
+this item is built, not done.
 
 ### 3.3 Preflight checks — **done**
 

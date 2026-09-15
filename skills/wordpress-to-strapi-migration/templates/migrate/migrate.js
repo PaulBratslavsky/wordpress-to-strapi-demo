@@ -6,6 +6,7 @@ import { checkConfig, preflight } from './lib/preflight.js';
 import { buildNavigation } from './lib/navigation.js';
 import { summaryMarkdown } from './lib/summary.js';
 import { parseSince, changedSince, shouldHydrate } from './lib/since.js';
+import { mapPool } from './lib/pool.js';
 import { StrapiClient } from './lib/strapi.js';
 import { MediaLibrary } from './lib/media.js';
 import { LinkRewriter } from './lib/links.js';
@@ -44,6 +45,9 @@ async function main() {
   const skipTypes = args['skip-types'] ?? '';
   // e.g. --since 2026-01-01 — only entries WordPress says changed after then.
   const since = parseSince(args.since);
+  // Entries migrate a few at a time: most of a migration is waiting on someone
+  // else's server. --concurrency 1 is the old strictly-sequential behaviour.
+  const concurrency = Math.max(1, Number(args.concurrency) || 4);
 
   const siteUrl = data.site.home;
   const strapiUrl = (process.env.STRAPI_URL || 'http://localhost:1337').replace(/\/$/, '');
@@ -282,7 +286,7 @@ async function main() {
   for (const t of types.filter(selected)) {
     const items = itemsFor(t);
     console.log(`\n■ ${t.displayName} → /api/${t.pluralName}  (${items.length})`);
-    for (const item of items) {
+    await mapPool(items, concurrency, async (item) => {
       const slug = slugs[t.singularName].get(item.id);
       const found = [];
       const warn = (code, detail = '') => found.push({ code, detail: String(detail).slice(0, 200) });
@@ -314,7 +318,7 @@ async function main() {
         failures.push({ type: t.singularName, wpId: item.id, slug, error: err.message, details: err.details });
         console.log(`  ✗ ${slug}: ${err.message}${err.details ? `  ${JSON.stringify(err.details).slice(0, 400)}` : ''}`);
       }
-    }
+    });
   }
 
   // --- Pass 2: relations ----------------------------------------------------------

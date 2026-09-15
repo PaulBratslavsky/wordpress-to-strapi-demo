@@ -145,6 +145,7 @@ itself — don't restart the user's server; wait for the reload and poll `/api/<
 node migrate.js --dry-run     # converts everything, writes previews, touches nothing
 node migrate.js               # for real; --only post,page, --limit N, --skip-types svg
 node migrate.js --since 2026-01-01   # catch up on what changed since the last run
+node migrate.js --concurrency 1      # strictly one entry at a time (default is 4)
 node verify.js
 ```
 

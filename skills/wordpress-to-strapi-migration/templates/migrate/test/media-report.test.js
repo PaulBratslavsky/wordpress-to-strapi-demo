@@ -114,6 +114,39 @@ test('--skip-types gives up on a type before spending a download on it', async (
   assert.match(lib.failures[0].reason, /skip/i);
 });
 
+/**
+ * Once entries migrate concurrently, two of them referencing the same attachment
+ * arrive together. Both would miss the cache, both would download, and both would
+ * upload — the same logo twice in the media library. Concurrent callers have to
+ * share one upload.
+ */
+test('uploads a file once when two entries ask for it at the same time', async () => {
+  let uploads = 0;
+  let fetches = 0;
+  globalThis.fetch = async () => {
+    fetches++;
+    await new Promise((r) => setTimeout(r, 5));
+    return { ok: true, arrayBuffer: async () => new ArrayBuffer(4), headers: { get: () => 'image/png' } };
+  };
+  const lib = library(
+    {
+      upload: async () => {
+        uploads++;
+        await new Promise((r) => setTimeout(r, 5));
+        return { id: 42 };
+      },
+      getFile: async () => null,
+    },
+    [attachment({ mime_type: 'image/png', source_url: 'http://wp.test/wp-content/uploads/2024/05/logo.png' })]
+  );
+
+  const [a, b] = await Promise.all([lib.ensureById(5), lib.ensureById(5)]);
+  assert.equal(uploads, 1, 'one upload, not two');
+  assert.equal(fetches, 1, 'and one download');
+  assert.equal(a.id, 42);
+  assert.equal(b.id, 42, 'both callers get the same file');
+});
+
 test('a type that was not skipped still uploads', async () => {
   globalThis.fetch = async () => ({
     ok: true,

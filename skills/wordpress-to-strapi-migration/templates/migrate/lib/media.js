@@ -59,6 +59,8 @@ export class MediaLibrary {
     this.failed = new Set();
     // Remedies already given, so a refused type is explained once rather than per file.
     this.advised = new Set();
+    // Uploads in progress, so entries running side by side share one upload of a shared file.
+    this.inFlight = new Map();
     for (const m of items) {
       const add = (u) => {
         const k = u && urlKey(u, siteUrl);
@@ -181,6 +183,22 @@ export class MediaLibrary {
       };
     }
 
+    // Two entries migrating at once often want the same attachment — a shared logo,
+    // the same hero. Without this they would both miss the cache, both download and
+    // both upload it, and the library would hold the file twice.
+    const inFlight = this.inFlight.get(key);
+    if (inFlight) return inFlight;
+
+    const work = this.#fetchAndUpload(key, src, ext);
+    this.inFlight.set(key, work);
+    try {
+      return await work;
+    } finally {
+      this.inFlight.delete(key);
+    }
+  }
+
+  async #fetchAndUpload(key, src, ext) {
     const cached = this.state.media[key];
     if (cached) {
       if (this.verified.has(cached.id)) return cached;
