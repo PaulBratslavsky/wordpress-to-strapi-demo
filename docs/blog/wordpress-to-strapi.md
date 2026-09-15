@@ -20,15 +20,23 @@ The reasons to move show up when content has to leave the page it was written on
   mobile app, on a kiosk screen, or on a second brand's site, and you are parsing markup to get
   it back out. Strapi stores fields — a heading is a heading, a price is a number — so one entry
   serves any number of front ends.
-- **The API is an afterthought.** WordPress shows a post type over REST only if somebody
-  registered it with `show_in_rest`, and a custom field only if somebody registered the meta.
-  Commercial themes routinely do neither, which costs us a whole section further down. In
-  Strapi, a field is in the API because you modelled it.
+- **Everything is opt-in over REST.** The WordPress REST API has been part of core since 4.7,
+  and it is well built. What catches people is that visibility is opt-in: a custom post type
+  appears at `/wp-json/wp/v2/` only if it was registered with `show_in_rest => true`, and a
+  custom field only if somebody called `register_post_meta()` with the same flag. Both default
+  to off, for a good reason — nobody wants private meta published by accident — and theme and
+  plugin authors routinely never turn them on. So the API describes what somebody remembered to
+  expose, not what the site holds. In Strapi a field is in the API because you modelled it;
+  there is no second switch. This is the single biggest trap in a WordPress migration, and it
+  has its own section below.
 - **Types, not strings.** Post meta is a key-value table of strings. A date is a string, a price
   is a string, a relationship is a string holding an id. Strapi has dates, numbers, media and
   relations, and it rejects content that doesn't fit the shape you declared.
-- **A smaller surface to keep patched.** Every plugin is code with database access running on
-  every request. Going headless takes the public front end out of PHP entirely.
+- **A different maintenance surface.** Every WordPress plugin is code with database access
+  running on every request, and the public site is PHP you keep patched. Headless moves that
+  surface rather than deleting it: you now run a Strapi app and a front end of your own, and
+  both need looking after. What changes is that the thing serving the public stops being the
+  thing with thirty plugins attached to it.
 
 What you keep is the editing experience. Strapi's admin is still a CMS your writers can use —
 this is not a migration into Markdown files in a Git repo.
