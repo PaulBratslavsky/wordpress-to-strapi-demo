@@ -55,7 +55,7 @@ The skill in [`skills/wordpress-to-strapi-migration/`](skills/wordpress-to-strap
 
 A copy lives at `.claude/skills/wordpress-to-strapi-migration/`, so **Claude Code finds it automatically when you open this repo** — nothing to install. To use it on a different project, copy that folder into `~/.claude/skills/` and it is available everywhere.
 
-You don't run the scripts yourself. Open the project in Claude Code and ask, naming your site and your Strapi:
+The scripts are plain Node, so you can run them directly if you prefer. With the skill installed, you describe your site instead and Claude runs them. Open the project in Claude Code and ask, naming your site and your Strapi:
 
 ```
 Migrate my WordPress site at http://my-site.local into the Strapi project

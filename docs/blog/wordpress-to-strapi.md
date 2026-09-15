@@ -4,8 +4,8 @@
 
 - A Claude Code skill reads your WordPress site through its REST API, works out matching Strapi
   v5 content types, and writes a migration you review before anything moves.
-- You do not run the scripts. You open the project in Claude Code and describe your site. Claude
-  runs each step and stops in the middle to show you what it plans to build.
+- The hard part is not moving the data. It is deciding which fields are content and which are
+  theme settings, and which pages are structured enough to be worth keeping as structure.
 - The biggest risk is invisible. WordPress hides post types and custom fields from its own REST
   API unless somebody switched them on. A migration can finish with no errors and still leave
   half your site behind.
@@ -194,8 +194,8 @@ flowchart LR
 Each step writes a file the next one reads, so you can stop anywhere, look at the file, and run
 one step again without repeating the others.
 
-You do not type those commands. Claude runs them, and the point of the review step is that it
-stops and waits for you.
+These are plain Node scripts and you can run them yourself. With the skill installed, you
+describe your site instead and Claude runs them for you, stopping at step 3 to wait for you.
 
 ## Set up a practice migration
 
