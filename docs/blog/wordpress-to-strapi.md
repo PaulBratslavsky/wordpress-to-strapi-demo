@@ -13,25 +13,25 @@ We ran it against two real sites. Everything in this post is what those runs pro
 WordPress is not the problem. If you run one site, with one theme, and the people editing it
 are happy, stay where you are.
 
-The reasons to move show up when content has to leave the page it was written on:
+It is also worth saying what you do *not* need a migration for. If you want WordPress content in
+a front end of your own, you can have that today: WPGraphQL, with WPGraphQL for ACF alongside it,
+or the REST API with `show_in_rest` switched on for your types and fields. Headless WordPress is
+a real, well-supported thing, and if that is the whole requirement, it is a smaller job than this
+one.
+
+The reasons to move are about the content model rather than the API:
 
 - **Content is welded to presentation.** A WordPress post is HTML shaped by a theme, and a page
   built with Elementor is layout JSON describing columns and widgets. Ask for that content in a
   mobile app, on a kiosk screen, or on a second brand's site, and you are parsing markup to get
   it back out. Strapi stores fields — a heading is a heading, a price is a number — so one entry
   serves any number of front ends.
-- **Everything is opt-in over REST.** The WordPress REST API has been part of core since 4.7,
-  and it is well built. What catches people is that visibility is opt-in: a custom post type
-  appears at `/wp-json/wp/v2/` only if it was registered with `show_in_rest => true`, and a
-  custom field only if somebody called `register_post_meta()` with the same flag. Both default
-  to off, for a good reason — nobody wants private meta published by accident — and theme and
-  plugin authors routinely never turn them on. So the API describes what somebody remembered to
-  expose, not what the site holds. In Strapi a field is in the API because you modelled it;
-  there is no second switch. This is the single biggest trap in a WordPress migration, and it
-  has its own section below.
-- **Types, not strings.** Post meta is a key-value table of strings. A date is a string, a price
-  is a string, a relationship is a string holding an id. Strapi has dates, numbers, media and
-  relations, and it rejects content that doesn't fit the shape you declared.
+- **Types live in plugin config, not in the data.** Post meta is a key-value table of strings: a
+  date is a string, a price is a string, a relationship is a string holding an id. ACF and
+  WPGraphQL will hand you typed values on the way out, and that is genuinely useful — but the
+  shape is a plugin's description of the data rather than a property of it, and nothing stops a
+  field holding something else tomorrow. Strapi has dates, numbers, media and relations, and it
+  refuses content that doesn't fit the shape you declared.
 - **A different maintenance surface.** Every WordPress plugin is code with database access
   running on every request, and the public site is PHP you keep patched. Headless moves that
   surface rather than deleting it: you now run a Strapi app and a front end of your own, and
@@ -82,6 +82,11 @@ plugins and public-domain photos. You can rebuild it in under a minute. It has t
 on purpose: a post type hidden from the API, ACF fields hidden from the API, a classic-editor
 post full of shortcodes, a draft with no slug, a scheduled post, and links to a domain that no
 longer exists.
+
+![The Northfield Studio home page: a dark navigation bar, the headline "Brand, web and product design for independent businesses", and a photograph of a studio desk.](images/wp-home.png)
+
+*Northfield Studio on the Inspiro theme. Every figure in this post came from migrating this site
+and one commercial theme's demo content.*
 
 Neuros is the site nobody controls: a theme vendor's post types, a different custom-field
 plugin, and Elementor everywhere. Its theme files are not in this repository. It is here
@@ -223,6 +228,12 @@ Five things to check:
   because deciding that a paragraph *is* a particular entry is not something a tool should
   guess at.
 
+![The Our Work page on Northfield Studio, listing six projects as links with a short description after each one.](images/wp-work.png)
+
+*The page the last point is about. Those six projects are also six `portfolio_item` entries, and
+nothing in the migrated page knows that. The plan flags it; what to do about it is a modelling
+decision, so the tool leaves it to you.*
+
 Editing this file costs minutes. Re-running a migration you got wrong costs a lot more.
 
 ### 5. Generate the Strapi schema
@@ -296,6 +307,13 @@ On the two test sites:
 - **Northfield:** the Team post type is hidden, and the projects' ACF field group has *Show in
   REST API* switched off. That is ACF's default. The fields are in the database and visible in
   WP Admin, and absent from the API.
+
+![A Riverbend Coffee Roasters project page showing sections titled The challenge, Our approach, a three-image gallery, and Results listing wholesale orders up 40 per cent.](images/wp-project.png)
+
+*This is what the hidden fields look like when they are working. The challenge, the approach,
+the gallery and the results are all ACF fields on a `portfolio_item`, rendered happily on the
+front end — and absent from `/wp-json/wp/v2/portfolio_item` until the helper plugin exposes
+them.*
 
 A migration that trusts what the API shows it would have moved either site "successfully" and
 lost roughly half of it, with no error anywhere.
