@@ -49,6 +49,19 @@ function dedupe(columns) {
 }
 
 /**
+ * The label a person sees on the component in Strapi's admin. Field names reach
+ * here in camelCase (`experienceList`), and a label of "ExperienceList" reads
+ * like a variable rather than a name.
+ */
+export const componentLabel = (name) =>
+  String(name ?? '')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/[-_]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+
+/**
  * WordPress meta is multi-row, so a single value usually arrives wrapped in a
  * one-item array and the analyzer unwraps it. A one-item array whose item is
  * *itself* an array is not that: it is a repeater with one row, and unwrapping

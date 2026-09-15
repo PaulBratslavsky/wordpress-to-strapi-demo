@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { listShape, wrapsRow } from '../lib/repeatable.js';
+import { listShape, wrapsRow, componentLabel } from '../lib/repeatable.js';
 
 /**
  * Repeating custom fields should become repeatable components rather than a
@@ -88,6 +88,15 @@ test('refuses a shape it cannot describe', () => {
 test('covers every column when rows are ragged', () => {
   const shape = listShape([[['a', 'b'], ['c', 'd', 'e']]]);
   assert.equal(shape.columns.length, 3);
+});
+
+/** The admin shows this label, so "ExperienceList" reads like a variable name. */
+test('turns a field name into a readable component label', () => {
+  assert.equal(componentLabel('experienceList'), 'Experience List');
+  assert.equal(componentLabel('contactInfoItem'), 'Contact Info Item');
+  assert.equal(componentLabel('specialties'), 'Specialties');
+  assert.equal(componentLabel('team-specialties'), 'Team Specialties');
+  assert.equal(componentLabel('team_member_boxes'), 'Team Member Boxes');
 });
 
 /**

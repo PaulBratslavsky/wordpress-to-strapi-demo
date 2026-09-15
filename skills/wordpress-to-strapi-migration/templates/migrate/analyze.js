@@ -3,7 +3,7 @@ import { loadJson, parseArgs, kebab, camel, pluralize, slugify, htmlToText, rout
 import { detectPageBuilder } from './lib/html.js';
 import { MediaLibrary } from './lib/media.js';
 import { planMarkdown } from './lib/plan.js';
-import { listShape, wrapsRow } from './lib/repeatable.js';
+import { listShape, wrapsRow, componentLabel } from './lib/repeatable.js';
 import { duplicatedCollections } from './lib/duplication.js';
 
 /**
@@ -320,7 +320,7 @@ function main() {
         if (field.type === 'list' && shape) {
           const uid = `lists.${t.singularName}-${kebab(name)}`;
           config.components[uid] = {
-            displayName: titleCase(name),
+            displayName: componentLabel(name),
             attributes: Object.fromEntries(shape.columns.map((c) => [c.name, { type: c.type }])),
           };
           t.fields[name] = {
