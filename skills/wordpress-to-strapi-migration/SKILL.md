@@ -182,6 +182,7 @@ download on it.
 | Author | `author` collection (users who wrote exported content only) |
 | Featured image, ACF image, gallery | `media`, uploaded to the library first |
 | Post body | `blocks` (default), `richtext` (Markdown), or a `sections` dynamic zone |
+| Embed, iframe, audio/video player | a link keeping the embed's title or caption (else the provider, else the file name); `sections.embed` in a dynamic zone. A `poster` frame is kept as an image |
 | ACF / Meta Box / registered meta | typed by value: string, text, integer, boolean, date, email, json, media, relation |
 | Repeating field (Meta Box repeater, list of values) | repeatable component; positional rows are named only where the shape is clear (`url`, `icon`, `period`, `description`), otherwise `fieldN` to rename |
 | ACF relationship / post object | `relation` |

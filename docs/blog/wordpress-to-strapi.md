@@ -456,9 +456,11 @@ The other warnings from that first run, with every body going into a Blocks fiel
 Say this part out loud before you promise anyone a date.
 
 - **Tables, dividers, embeds and galleries inside Blocks.** Blocks has no node for them. Tables
-  flatten to paragraphs, embeds become links, galleries become consecutive images, horizontal
-  rules are dropped. Use the Markdown mode to keep tables, or the dynamic zone to keep the
-  structure.
+  flatten to paragraphs, galleries become consecutive images, horizontal rules are dropped, and
+  embeds become links — links that keep the embed's own description, though: its title or
+  caption, else the provider ("View on YouTube"), else the file name, because a reader handed
+  `maps.google.com/maps?q=…` has been told nothing. Use the Markdown mode to keep tables, or the
+  dynamic zone to keep the structure.
 - **Comments.** Counted and reported, not migrated. Strapi has no built-in comments. Use a
   plugin, or model a `comment` collection with a relation to the entry.
 - **Menu nesting, as nesting.** Menus themselves do migrate, into a `navigation` single type.

@@ -1,6 +1,7 @@
 import { parseHTML } from 'linkedom';
 import TurndownService from 'turndown';
 import turndownGfm from '@joplin/turndown-plugin-gfm';
+import { providerOf } from './sections.js';
 
 /**
  * WordPress HTML → Markdown.
@@ -62,18 +63,31 @@ export function parseWordPressHtml(html, { shortcodes = 'strip' } = {}) {
     img.removeAttribute('sizes');
   }
 
-  // Embeds (YouTube, Vimeo, X ...) and raw iframes / media players → a link to the source.
+  // Embeds (YouTube, Vimeo, X ...) and raw iframes / media players → a link to the
+  // source. Blocks cannot embed anything, so the link text has to carry whatever the
+  // embed said about itself; otherwise the reader is handed a query string and told
+  // nothing. WordPress puts that description in a figcaption or a title attribute.
   for (const fig of $$('figure.wp-block-embed, div.wp-block-embed')) {
-    const url =
-      fig.querySelector('.wp-block-embed__wrapper')?.textContent.trim() ||
-      fig.querySelector('iframe')?.getAttribute('src') ||
-      '';
-    fig.replaceWith(linkParagraph(document, url));
+    const iframe = fig.querySelector('iframe');
+    const url = fig.querySelector('.wp-block-embed__wrapper')?.textContent.trim() || iframe?.getAttribute('src') || '';
+    const label = clean(fig.querySelector('figcaption')?.textContent) || clean(iframe?.getAttribute('title'));
+    fig.replaceWith(linkParagraph(document, url, label));
     warn('embed', url);
   }
   for (const node of $$('iframe, video, audio, object, embed')) {
     const url = node.getAttribute('src') || node.getAttribute('data') || node.querySelector('source')?.getAttribute('src') || '';
-    node.replaceWith(linkParagraph(document, url));
+    const label = clean(node.getAttribute('title')) || clean(node.getAttribute('aria-label'));
+
+    // A poster frame is the only picture of a video that Blocks can keep.
+    const poster = node.getAttribute('poster');
+    if (poster && url) {
+      const img = document.createElement('img');
+      img.setAttribute('src', poster);
+      if (label) img.setAttribute('alt', label);
+      node.parentNode.insertBefore(wrap(document, 'p', img), node);
+    }
+
+    node.replaceWith(linkParagraph(document, url, label));
     warn(node.localName === 'iframe' ? 'iframe' : 'media-player', url);
   }
 
@@ -174,11 +188,41 @@ function text(document, tag, value) {
   return el;
 }
 
-function linkParagraph(document, url) {
+const clean = (value) => String(value ?? '').replace(/\s+/g, ' ').trim();
+
+const PROVIDER_NAMES = { youtube: 'YouTube', vimeo: 'Vimeo', twitter: 'X', soundcloud: 'SoundCloud' };
+
+/**
+ * A label for an embed nobody described. Naming a provider we recognise reads
+ * better than a query string; an unrecognised host tells the reader nothing the
+ * URL doesn't, so the URL stays.
+ */
+function providerLabel(url) {
+  const name = PROVIDER_NAMES[providerOf(url)];
+  return name ? `View on ${name}` : '';
+}
+
+const MEDIA_FILE = /\.(mp3|m4a|wav|ogg|oga|flac|aac|mp4|m4v|mov|webm|ogv|avi|pdf)$/i;
+
+/**
+ * For a link straight to a file, its name reads better than its URL — a page of
+ * untitled audio players otherwise migrates as the same long URL over and over.
+ * Only for real files: calling an ordinary page path a filename would be a guess.
+ */
+function fileLabel(url) {
+  try {
+    const name = decodeURIComponent(new URL(url, 'http://relative.invalid').pathname.split('/').pop() || '');
+    return MEDIA_FILE.test(name) ? name : '';
+  } catch {
+    return '';
+  }
+}
+
+function linkParagraph(document, url, label = '') {
   if (!url) return document.createTextNode('');
   const a = document.createElement('a');
   a.setAttribute('href', url);
-  a.textContent = url;
+  a.textContent = label || providerLabel(url) || fileLabel(url) || url;
   return wrap(document, 'p', a);
 }
 

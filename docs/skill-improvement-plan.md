@@ -16,10 +16,10 @@ Priorities are ordered by how much they change the quality of a migration, not b
 > fatal), 2.3 (menus → a navigation single type), 2.5 (redirects for slugs that change), 2.7
 > (caption URLs counted apart from stale content), 3.1 (`wpSite` namespacing), 3.3 (preflight),
 > 3.5 (the written plan file), 4.4 (the readable run summary), 2.6 (refused file types) and
-> 2.4 (what to do about comments), 3.4 (incremental runs) and 1.3's repeating lists,
-> alongside 4.1–4.3.
+> 2.4 (what to do about comments), 3.4 (incremental runs), 1.3's repeating lists and 2.2
+> (embeds keep their description), alongside 4.1–4.3.
 >
-> **Still open:** 1.4, 2.2 and 3.2.
+> **Still open:** 1.4 and 3.2.
 
 ---
 
@@ -126,10 +126,24 @@ the original URL in place.
 *Evidence:* on Neuros the report names the two SVGs Strapi refuses
 (`File type 'image/svg+xml' is not allowed`), used across thirteen places.
 
-### 2.2 Audio, video and iframes
+### 2.2 Audio, video and iframes — **done**
 
-61 `media-player` and 2 `iframe` warnings on Neuros became plain links. With 1.2 in place
-they become `sections.embed`; until then, at least preserve the poster image and title.
+Blocks cannot embed anything, so an iframe, video or audio player becomes a link. It used to
+become a link whose text was the raw URL, which threw away the only human description the
+embed had. The link now carries it: the `title` attribute, else the figcaption, else a named
+provider ("View on YouTube"), else — for a link straight to a file — the file's own name.
+Both lanes keep the same information: `sections.embed` now falls back to the iframe's title
+where there is no caption.
+
+*Evidence, all from the real Neuros export:* the contacts page's map migrated as
+`maps.google.com/maps?q=London%20Eye%2C%20London…` and now reads **"London Eye, London,
+United Kingdom"**; the home page's player now reads **"Video Placeholder"**; and home-5's
+**34** untitled audio players, previously 34 copies of one long URL, now read
+`audio_sample.mp3`.
+
+*Supported but unexercised:* a `poster` frame is kept as an image, so a video leaves a picture
+behind rather than a bare link. No embed in either demo site has a `poster` attribute, so that
+path is covered by tests only.
 
 ### 2.3 Menus → a Navigation single type — **done**
 

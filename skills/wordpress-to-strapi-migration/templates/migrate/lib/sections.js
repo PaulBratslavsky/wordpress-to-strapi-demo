@@ -63,7 +63,10 @@ function embedDescriptor(el) {
     media?.getAttribute('src') ||
     media?.querySelector('source')?.getAttribute('src') ||
     '';
-  return { kind: 'embed', url, provider: providerOf(url), title: text(directChild(el, 'figcaption')) };
+  // A figcaption where there is one, otherwise whatever the iframe called itself —
+  // the same description the Blocks lane keeps, so neither lane loses more than the other.
+  const title = text(directChild(el, 'figcaption')) || clean(iframe?.getAttribute('title'));
+  return { kind: 'embed', url, provider: providerOf(url), title };
 }
 
 function codeDescriptor(pre) {
