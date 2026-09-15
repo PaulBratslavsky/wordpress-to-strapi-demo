@@ -23,13 +23,56 @@ that you can do this to a site you care about.
 
 ## What a migration actually moves
 
-A WordPress site keeps its content in two places at once. There is the content itself: a post
-title, the words in the body, a featured image, which category it belongs to. Then there is
-everything the theme adds on top: the layout, the colours, the widget in the sidebar, the
-section order on the home page.
+Strapi is a headless CMS. Headless means it has no front end of its own. It stores your content
+as structured fields, serves them over an API or via MCP, and leaves the rendering to something else: a
+Next.js site, a mobile app, whatever you build. 
 
-Strapi holds the first kind. It does not hold the second. So a migration is not a copy. It is a
-sorting job, and the sorting is the part that takes judgement.
+WordPress works the other way. It ships the content and the website as one thing, which is why installing a theme changes how your posts look.
+
+That difference decides what a migration can carry, so it is worth being clear about the differences.
+
+A WordPress site holds two kinds of thing side by side. There is content: a post title, the
+words in the body, a featured image, the category it belongs to. There is also presentation: the
+layout, the colors, the sidebar widget, the order of sections on the home page. Both sit in the
+same database, and sometimes in the same fields.
+
+Strapi takes the first and not the second. Titles, body text, images, dates and relations all
+move across. Your theme does not, and neither do the settings that exist for it.
+
+That sounds like a loss until the content has to appear somewhere other than the page it was
+written on. 
+
+A post stored as theme-shaped HTML is only usable by something that renders HTML the
+same way. A post stored as fields can be read by anything: your website, an iOS app, a kiosk
+screen, a newsletter builder, a second brand's site, a search index. One entry, many places.
+
+That is what people mean by multi-channel, and it is the whole reason to store content as fields
+rather than as pages.
+
+Getting that benefit depends on how you structure the content, and five habits carry most of
+the weight:
+
+- **One idea per field.** A price is a number, not a sentence with a number in it. A launch date
+  is a date. Then a front end can sort by price, and you can ask for everything launched this
+  year without parsing strings.
+- **Things that repeat become their own collection.** If five articles name the same author,
+  that author is one entry with a relation to each article, not a name typed five times. Change
+  their job title once and every article follows.
+- **Sections that repeat become components.** A landing page made of a hero, three features and
+  a call to action is five pieces in order, not one block of markup. An editor can reorder them
+  without touching code.
+- **A page built of varied sections becomes a dynamic zone.** Components are the pieces. A
+  dynamic zone is the slot they drop into, holding an ordered list of mixed ones: hero, then
+  rich text, then a gallery, then a call to action. Each page chooses its own set and its own
+  order, and an editor rearranges them by dragging, not by editing markup.
+- **A field type Strapi lacks is one you can add.** Text, number, date, boolean, media and
+  relations ship with it. Anything else is a custom field: a small plugin that registers a new
+  type so it appears in the Content-Type Builder beside the built-in ones. A colour picker, a
+  map location, a star rating.
+
+So a migration is not a copy. Every field has to land in one of three piles: content that moves,
+presentation that stays behind, and the pile that looks like one but is really the other. That
+third pile is where the judgement goes, and most of this post is about it.
 
 Four questions decide how yours will go. Answer them before you start.
 
@@ -37,17 +80,20 @@ Four questions decide how yours will go. Answer them before you start.
 these post types. Posts and Pages come as standard. A plugin or theme can register more:
 Services, Team, Projects, Vacancies. Each one becomes a collection type in Strapi.
 
-**Which fields carry content, and which carry presentation?** A field called `client_name` is
-content. A field called `header_background_colour` is not. Both arrive through the same channel
-and look identical in the database. Sorting them is the main decision you will make.
+**Which fields are which?** This is the third pile from a moment ago, and it is worth knowing
+how hard it can get. `client_name` is obviously content and `header_background_colour` is
+obviously not. The awkward ones sit between: a `subtitle` that half your entries use as a real
+subheading and the other half leave blank because the theme hides it, or a `featured` checkbox
+that drives a carousel. Both arrive through the same channel and look identical in the database.
 
 **How were the pages built?** A page written in the block editor is text with some structure.
 A page built with Elementor is a layout description. Those two need different treatment, and
 mixing them up is how you end up with a wall of flattened HTML in your new CMS.
 
-**Which URLs have to keep working?** Anything with inbound links. If your posts live at
-`/2019/05/our-kitchen/` today and you move them to `/blog/our-kitchen/`, something has to
-redirect.
+**Which URLs have to keep working?** Find out before you decide anything, because the answer is
+rarely all of them. Check analytics for the pages that actually get traffic, Search Console for
+what ranks, and your inbox for the links sitting in old newsletters. A page nobody has visited in
+three years does not constrain your new URL scheme. Your top twenty do.
 
 ## Decisions to make before you start
 
@@ -90,7 +136,7 @@ and this post's demo site exists so you can practise on something disposable fir
 
 ## Improving the model while you move it
 
-A migration is the cheapest moment you will ever get to fix your content model. Today, turning
+A migration is a great moment you will ever get to fix your content model. Today, turning
 three loose fields into one component is a line in a config file. Once five thousand entries are
 in Strapi and a front end is reading them, the same change is a data migration and a release.
 
@@ -294,6 +340,40 @@ disappearing, and gets counted by name in the report so you can see what it did 
 
 **How to check:** look for `_elementor_data` in your post meta, or just open a page in WP Admin
 and see whether it opens in Elementor.
+
+#### One case study, before and after
+
+Neuros builds its case studies in Elementor. Here is one of them on the WordPress side, a
+heading and body text followed by a pair of images:
+
+![A Neuros case study page titled The challenge, with two paragraphs of body text and two images below them.](images/wp-case-study.png)
+
+And the same entry after migration, in Strapi's Content Manager:
+
+![The same case study in Strapi's Content Manager, showing a content dynamic zone containing five components: Rich Text, Image, Image, Rich Text, Rich Text.](images/strapi-case-study.png)
+
+The API says the same thing:
+
+```
+GET /api/case-studies?filters[slug][$eq]=transforming-healthcare-with-predictive-analytics
+    &populate[content][populate]=*
+
+title:   Transforming healthcare with predictive analytics
+wpId:    17341
+wpSite:  neuros.local
+content: 5 components
+  1. sections.rich-text    1,556 characters
+  2. sections.image        nelson-ndongala-1-min.jpg
+  3. sections.image        nelson-ndongala-6-1-min.jpg
+  4. sections.rich-text    2,505 characters
+  5. sections.rich-text    1,319 characters
+```
+
+That is what the dynamic zone buys. An editor can reorder those five, delete one, or add a
+sixth, without touching markup. The two images are real entries in Strapi's media library
+rather than URLs pointing back at WordPress. In a Blocks field the same page arrives as one
+long body, which reads the same on the page and cannot be rearranged by anyone who is not
+comfortable editing HTML.
 
 ### Custom fields, and the shapes they arrive in
 
