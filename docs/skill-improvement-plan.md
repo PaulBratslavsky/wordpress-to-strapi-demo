@@ -19,7 +19,9 @@ Priorities are ordered by how much they change the quality of a migration, not b
 > 2.4 (what to do about comments), 3.4 (incremental runs), 1.3's repeating lists, 2.2 (embeds
 > keep their description) and 1.4 (pages that duplicate a collection), alongside 4.1–4.3.
 >
-> **Still open:** 3.2 (parallel uploads), which needs a live Strapi to verify.
+> **Still open:** 3.2 (parallel uploads), built but needing a live Strapi to measure, and 1.5
+> (promoting a tag-like field to a collection), which the sibling Contentful skill has and this
+> one does not.
 
 ---
 
@@ -102,6 +104,26 @@ Still deliberately out: relations and rich text inside a component are coerced t
 those are modelling decisions for a human. And a single-row repeater of *named objects* is
 still read as one object, because an ACF image arrives as `[{…}]` and must unwrap to be
 recognised; telling those two apart is guesswork.
+
+### 1.5 Promote a tag-like field to a collection — **open**
+
+Writing the blog post turned up a capability the sibling Contentful skill has and this one does
+not. A field holding a repeated list of short strings (`specialties: ["branding", "ui",
+"strategy"]` on every team member) is a tag vocabulary wearing a text field's clothes. Strapi's
+answer is a collection plus a relation, so you can ask which team members do branding.
+
+`contentful-to-strapi-migration` treats this as a first-class step: `analyze.js` flags tag-like
+fields, the config carries a `promote` block, and `generate.js` builds the collection and the
+relation. Its migration output even has a stage for it, `[2/4] Promoting tag-like fields`.
+
+Here the analyzer only leaves a note suggesting it, and the engine has no transform for it.
+`listShape` sends the field to a repeatable component instead, which is a fair default and not
+the same thing. Building it means creating a type with no WordPress source (the `navigation`
+single type already proves that is possible), collecting the distinct values across every entry,
+creating one entry per value, and rewriting the field as a `manyToMany` relation in pass 2.
+
+*Evidence:* Northfield's `team.specialties` and Neuros's `team_member_responsibilities_list`
+both migrate as repeatable components today, and both read like vocabularies.
 
 ### 1.4 Follow LaunchPad's reusable-section pattern — **done** (detect and flag)
 

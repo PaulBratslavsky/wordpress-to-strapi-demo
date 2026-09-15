@@ -76,6 +76,46 @@ is a decision you made on their behalf.
 **Work from a copy.** Never rehearse on the live site. Local makes one in a couple of minutes,
 and this post's demo site exists so you can practise on something disposable first.
 
+## Improving the model while you move it
+
+A migration is the cheapest moment you will ever get to fix your content model. Today, turning
+three loose fields into one component is a line in a config file. Once five thousand entries are
+in Strapi and a front end is reading them, the same change is a data migration and a release.
+
+The shape WordPress hands you is often an accident. It is the sum of which plugins somebody
+installed, what the theme needed, and what got added in a hurry three years ago. You are not
+required to reproduce it.
+
+| What WordPress gives you | What you can have instead |
+|---|---|
+| `specialties: ["branding", "ui", "strategy"]` as text on every team member | a `Skill` collection with relations, so you can ask who does branding |
+| a Work page listing your six projects as copy | a relation to the six `portfolio_item` entries, so the page follows them |
+| `header_background_colour`, `page_title_padding` | nothing. That belongs in the front end |
+| a body that is one block of rich text on a page that is really five sections | a dynamic zone, so an editor can move a section without editing HTML |
+
+Some of this the skill does without being asked. It collapses a flattened ACF group into one
+component, types `"20240415"` as a date rather than a number, drops keys that look like theme
+settings, strips a vendor prefix so `neuros_service` becomes `service`, and turns a repeating
+field into a repeatable component. Those are safe because the evidence is in the data.
+
+Some of it is a config edit at the review step. Choosing `dynamic-zone` over `blocks` for a type,
+renaming a field, deleting one, pulling a key back out of the ignored list: all of that is
+changing `migration.config.json` before anything is generated.
+
+And some of it the skill will not do for you today. It flags a page that repeats a collection,
+but it will not rewrite that page into a relation, because deciding a paragraph *is* a given
+entry is a judgement call and a confident wrong guess replaces real content with a link to the
+wrong thing. It has no way to promote `specialties` into a `Skill` collection either: that means
+inventing a collection WordPress never had and filling it from the distinct values of a field.
+Both are worth doing by hand afterwards, in the Strapi admin or with a short script, once the
+content is in and you can see it.
+
+**Where to stop.** Every change is also a change your front end has to handle, and a migration
+that redesigns the model at the same time is two risky projects sharing one deadline. Normalise
+the structure, not the words: changing how a field is shaped is a contained job, rewriting
+everybody's copy is a different one with different reviewers. If you cannot say what a change
+buys you, keep the shape you have and move on.
+
 ## What to anticipate on your own site
 
 These are the five things that cost the most time on the two sites we migrated. Each one is
