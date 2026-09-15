@@ -46,6 +46,36 @@ mixing them up is how you end up with a wall of flattened HTML in your new CMS.
 `/2019/05/our-kitchen/` today and you move them to `/blog/our-kitchen/`, something has to
 redirect.
 
+## Decisions to make before you start
+
+The mechanical part of a migration is quick. The deciding is what takes the time, and most of it
+can happen before you run anything.
+
+**Treat it as a loop, not an event.** Your first run will be wrong somewhere. That is the
+expected outcome rather than a failure. Entries are matched on their WordPress id and their
+source site, so running it again updates what is already there instead of making a second copy.
+Budget for three or four passes: run it, read what it flagged, change the config, run it again.
+
+**Decide what you are not moving.** This is the cheapest decision available and the one people
+skip. Nine years of posts, an events type nobody has touched since 2021, three hundred images
+attached to nothing. Leaving those behind costs nothing, and everything you bring across is
+something you have to check.
+
+**Settle the URLs early.** If your posts stay at `/2019/05/our-kitchen/` you need no redirects at
+all. If they move to `/blog/our-kitchen/` you need one for every post. That choice is much harder
+to reverse once the new site is live and indexed.
+
+**Remember Strapi is half the job.** It holds your content and serves it over an API. It does not
+render your site. Moving the content and building the front end are two separate pieces of work,
+and the second is usually the larger one.
+
+**Involve whoever edits the site.** The content model you end up with is what they will use every
+day. A field called `field2`, or a page that arrives as one undifferentiated block of rich text,
+is a decision you made on their behalf.
+
+**Work from a copy.** Never rehearse on the live site. Local makes one in a couple of minutes,
+and this post's demo site exists so you can practise on something disposable first.
+
 ## What to anticipate on your own site
 
 These are the five things that cost the most time on the two sites we migrated. Each one is
@@ -53,11 +83,23 @@ worth checking before you begin.
 
 ### Content WordPress hides from its own API
 
-WordPress only shows a post type at `/wp-json/wp/v2/` if whoever registered it passed
-`show_in_rest => true`. The same applies to custom fields: they appear only if somebody called
-`register_post_meta()` with that flag. Both default to off. That default is reasonable, because
-nobody wants private data published by accident. The effect is that the API describes what
-somebody remembered to expose, not what your site contains.
+Start here, because this is the only failure in a migration that stays quiet. Everything else
+tells you when it goes wrong: an image that will not upload throws an error, a field of the
+wrong type gets rejected. This one does not. The migration finishes, every count matches, and
+content you did not know was missing is missing.
+
+It happens because WordPress holds two different answers to "what is on this site". The database
+has one. The REST API has another, and the API lists only what somebody opted in.
+
+A post type appears at `/wp-json/wp/v2/` only if it was registered with `show_in_rest => true`.
+A custom field appears only if somebody called `register_post_meta()` with the same flag. Both
+default to off, which is the right default: adding a field to your site should not publish it to
+the internet.
+
+The result is that your Team entries can be in the database, listed in WP Admin, and visible on
+the site, and `/wp-json/wp/v2/team` still returns a 404. A migration reading that API sees a site
+with no team. It moves everything it can see and reports success, because from where it stands
+nothing went wrong.
 
 On the two sites we tested:
 
@@ -71,12 +113,24 @@ Here is what those hidden fields look like when they are working:
 
 ![A Riverbend Coffee Roasters project page showing sections titled The challenge, Our approach, a three-image gallery, and Results listing wholesale orders up 40 per cent.](images/wp-project.png)
 
-The challenge, the approach, the gallery and the results on that page are all ACF fields. They
-render happily on the front end. Ask `/wp-json/wp/v2/portfolio_item` for them and they are not
-there.
+The challenge, the approach, the gallery and the results on that page are all ACF fields, and
+every one of them is content somebody wrote and would expect to keep.
 
-A migration that trusts the API would move either site with no errors and lose roughly half of
-it. Nothing would warn you.
+Here is that entry over the API, on the site as it stands today. Asking for it as an
+authenticated editor, with the helper plugin installed:
+
+```
+GET /wp/v2/portfolio_item?context=edit
+
+acf:            []
+migration_meta: client_name, year, website, launch_date, services_provided,
+                hero_image, results_headline, results_metric, results_summary
+```
+
+ACF returns an empty array, because *Show in REST API* is off for that field group. Every one of
+those fields reaches the migration through `migration_meta`, which is what the helper adds. Drop
+the helper and that second line is empty too, and the entry arrives in Strapi as a title and a
+body with nothing else attached.
 
 **How to check:** open `http://your-site.local/wp-json/wp/v2/types` in a browser. Compare that
 list against the post types in your WP Admin menu. Anything in the menu but not in the JSON is
@@ -85,8 +139,28 @@ hidden.
 **What to do:** the skill ships a temporary plugin,
 `templates/wordpress/strapi-migration-helper.php`. Copy it into `wp-content/mu-plugins/`.
 A must-use plugin is a PHP file WordPress loads automatically, with nothing to activate. This
-one switches `show_in_rest` on for public types that opted out, and returns every custom field
-on an entry as `migration_meta` to logged-in editors. Delete it when the migration is done.
+one switches `show_in_rest` on for public types that opted out, and adds every custom field to
+an entry as `migration_meta`. Delete it when the migration is done.
+
+Two things about that field catch people out, including me while writing this. It only appears
+on an authenticated request, and only when you ask for `context=edit`. An anonymous read of the
+same entry shows `acf: []` and no `migration_meta` at all, which looks exactly like a plugin
+that is not working. That is also why the application password is on the prerequisites list
+rather than being optional: without it the export asks for `context=view` and gets the public
+answer.
+
+It also reports what it did. Ask it directly:
+
+```
+GET /wp-json/strapi-migration/v1/info
+
+{"version":"1.0.0","forced_post_types":["team"],"forced_taxonomies":["department"]}
+```
+
+On Northfield that is one post type and one taxonomy that would otherwise have been invisible.
+Services, testimonials and projects are absent from that list because Custom Post Type UI
+registered them with REST access already, which is the useful thing about the endpoint: it tells
+you what was actually at risk rather than what might have been.
 
 ### Pages built with a page builder
 
@@ -350,13 +424,13 @@ separately.
 - **Multilingual content** (WPML, Polylang). Migrate one language, then map the rest onto
   Strapi's i18n yourself.
 
-Two hazards live in the WordPress site rather than in Strapi. Theme demo content often points at
-the vendor's server: the Neuros demo had roughly 4,250 image references and 810 links to
-`demo.artureanec.com`, inside Elementor JSON, post bodies, menus and theme settings. Importers do
-not rewrite those, and `wp search-replace` has to run twice, once for plain URLs and once for the
-JSON-escaped form (`https:\/\/...`) that page builders store. Importing the same content twice
-also leaves duplicate meta rows, which turn every custom field into a two-element array. On the
-repaired Neuros site that was 8,993 of 12,398 post-and-key pairs.
+One thing to check before you start, if your site began life as a theme's demo content. Those
+demos reference the vendor's own server, and editing a few pages does not remove the rest. The
+Neuros demo still held about 4,250 image references and 810 links to `demo.artureanec.com`,
+inside Elementor JSON, post bodies, menus and theme settings. Those migrate across exactly as
+they are, so your new site would load images from a stranger's domain. Fix it in WordPress
+first, with `wp search-replace`, and run it twice: once for plain URLs, and once for the
+JSON-escaped form (`https:\/\/...`) that page builders store.
 
 ## Doing it on your own site
 
