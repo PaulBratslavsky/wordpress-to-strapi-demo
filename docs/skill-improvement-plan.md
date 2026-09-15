@@ -376,13 +376,25 @@ not in the summary that faithfully reports them.
 
 ---
 
-## Suggested order
+## What's left
 
-1. `SKILL.md` and references (4.1, 4.2) — without them the skill can't be used at all.
-2. Preflight checks and the plan file (3.3, 3.5) — cheap, and they remove the two failure
-   modes that cost us the most time.
-3. The `bodyMode` setting plus the HTML segmenter and component set (1.1, plus the generic
-   half of 1.2).
-4. The Elementor mapper (the rest of 1.2) and ACF Group components (1.3).
-5. Media reporting, menus, redirects (2.1, 2.3, 2.5).
-6. Everything in P3 that's left.
+Everything above is built except **3.2 (parallel uploads and resume)**, which needs a live
+Strapi to be worth doing: the concurrency logic is easy to unit-test, but the thing it exists
+to improve — throughput on a library of thousands of files — can only be measured against a
+real server.
+
+Two paths are also implemented but unproven for the same reason, and both want one API token:
+the live navigation write, and pass-2's relation hydration under `--since`.
+
+The order the work actually went in, for anyone repeating it: `SKILL.md` and the references
+first (4.1, 4.2), because without them the skill cannot load at all; then preflight and the
+plan file (3.3, 3.5), the cheapest fixes for the failure modes that cost the most time; then
+content shaping (1.1, 1.2, 1.3); then fidelity and reporting (2.x, 4.4); and robustness last
+(3.1, 3.4) — where building one item kept exposing a bug in another.
+
+That last part is the pattern worth carrying forward. Four of these items were finished only
+because real data contradicted the plan or the code: the analyzer's `raw` transform would have
+made preflight reject every valid config; `--since` uncovered a latent `--limit` bug that
+dropped relations silently; a synthetic fixture caught single-row repeaters migrating as
+`"250+,Awesome team members"`; and one embed test passed without the feature it was testing.
+None of those would have surfaced from unit tests or reasoning alone.
