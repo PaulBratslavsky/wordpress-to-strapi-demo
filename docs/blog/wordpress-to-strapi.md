@@ -1,631 +1,417 @@
-# How to migrate from WordPress to Strapi using a Claude Code skill
-
-By the end of this you will have moved a whole WordPress site into Strapi 5: posts, pages,
-custom post types, taxonomies, authors, the media library, and the custom fields that ACF and
-Meta Box store. You will not write the migration code. You point a Claude Code skill at the
-WordPress site, it reads the site's own content model, proposes matching Strapi content types,
-and writes a migration you review before anything moves.
-
-We ran it against two real sites. Everything in this post is what those runs produced.
-
-## Why move from WordPress to Strapi?
-
-WordPress is not the problem. If you run one site, with one theme, and the people editing it
-are happy, stay where you are.
-
-It is also worth saying what you do *not* need a migration for. If you want WordPress content in
-a front end of your own, you can have that today: WPGraphQL, with WPGraphQL for ACF alongside it,
-or the REST API with `show_in_rest` switched on for your types and fields. Headless WordPress is
-a real, well-supported thing, and if that is the whole requirement, it is a smaller job than this
-one.
-
-The reasons to move are about the content model rather than the API:
-
-- **Content is welded to presentation.** A WordPress post is HTML shaped by a theme, and a page
-  built with Elementor is layout JSON describing columns and widgets. Ask for that content in a
-  mobile app, on a kiosk screen, or on a second brand's site, and you are parsing markup to get
-  it back out. Strapi stores fields — a heading is a heading, a price is a number — so one entry
-  serves any number of front ends.
-- **Types live in plugin config, not in the data.** Post meta is a key-value table of strings: a
-  date is a string, a price is a string, a relationship is a string holding an id. ACF and
-  WPGraphQL will hand you typed values on the way out, and that is genuinely useful — but the
-  shape is a plugin's description of the data rather than a property of it, and nothing stops a
-  field holding something else tomorrow. Strapi has dates, numbers, media and relations, and it
-  refuses content that doesn't fit the shape you declared.
-- **A different maintenance surface.** Every WordPress plugin is code with database access
-  running on every request, and the public site is PHP you keep patched. Headless moves that
-  surface rather than deleting it: you now run a Strapi app and a front end of your own, and
-  both need looking after. What changes is that the thing serving the public stops being the
-  thing with thirty plugins attached to it.
-
-What you keep is the editing experience. Strapi's admin is still a CMS your writers can use —
-this is not a migration into Markdown files in a Git repo.
-
-## What you end up with
-
-A Strapi v5 project containing:
-
-- One collection type per WordPress post type, and one per taxonomy. Categories and tags
-  become real collections with relations, not text fields.
-- Every entry, with its body converted to Strapi's rich-text **Blocks** field, or to a dynamic
-  zone of components when the page was built with a page builder.
-- The media library, uploaded file by file, with alt text and captions.
-- Authors as their own collection, related to the entries they wrote.
-- Your menus, as a `navigation` single type, with each item's link resolved to wherever that
-  content landed in Strapi.
-- Custom fields typed by what they hold: dates as dates, attachment ids as media, post ids as
-  relations.
-- `wpId`, `wpSite` and `wpLink` on every entry, so a second run updates instead of duplicating —
-  even when one Strapi holds migrations from several WordPress sites — and so you can trace
-  anything back to WordPress.
-- `redirects.json` for any URL that had to change, `migration-report.json` listing every entry
-  the tool was unsure about, and `migration-summary.md` saying the same thing in words.
-
-Drafts stay drafts. Scheduled and private posts arrive as drafts with their original WordPress
-status kept in a `wpStatus` field.
-
-## Two example sites, and why two
-
-A migration tool that only works on content you wrote yourself is not a migration tool. So the
-skill was tested on two sites picked to be opposites.
-
-| | **Northfield Studio** | **Neuros** |
-|---|---|---|
-| Built with | free wordpress.org plugins, content written for this repo | Neuros 2.2.1, a commercial ThemeForest theme with its demo content |
-| Size | 36 entries, 30 images | 114 entries, 389 images |
-| Content types | 6 (posts, pages, services, projects, team, testimonials) | 7 (posts, pages, services, projects, case studies, team, vacancies) |
-| Custom fields | ACF | Meta Box |
-| Page builder | Elementor on 2 of 8 pages | Elementor on 35 of 43 pages, and on every service and case study |
-
-Northfield Studio is a fictional design agency, built by a plugin in this repository from free
-plugins and public-domain photos. You can rebuild it in under a minute. It has the hard parts
-on purpose: a post type hidden from the API, ACF fields hidden from the API, a classic-editor
-post full of shortcodes, a draft with no slug, a scheduled post, and links to a domain that no
-longer exists.
-
-![The Northfield Studio home page: a dark navigation bar, the headline "Brand, web and product design for independent businesses", and a photograph of a studio desk.](images/wp-home.png)
-
-*Northfield Studio on the Inspiro theme. Every figure in this post came from migrating this site
-and one commercial theme's demo content.*
-
-Neuros is the site nobody controls: a theme vendor's post types, a different custom-field
-plugin, and Elementor everywhere. Its theme files are not in this repository. It is here
-because it is the honest test, and because most of the surprises below came from it.
-
-## Before you start
-
-1. **The WordPress site, reachable over HTTP.** Local, staging, or production.
-2. **An application password.** In WP Admin go to Users, Profile, Application Passwords. An
-   application password is a per-tool password that WordPress accepts for API requests. Without
-   one you get published content only: no drafts, no private posts, no custom fields. WordPress
-   accepts these over plain HTTP only on a site marked as a local environment, which
-   [Local](https://localwp.com) does for you.
-3. **The helper plugin.** Copy `templates/wordpress/strapi-migration-helper.php` into
-   `wp-content/mu-plugins/`. The next section explains why this is the most important step on
-   the list.
-4. **A Strapi v5 project.** If you do not have one:
-
-   ```bash
-   npx create-strapi-app@latest my-strapi --no-run --skip-cloud --typescript \
-     --dbclient sqlite --dbfile .tmp/data.db
-   ```
-
-   Pass `--dbfile`. Without it Strapi writes an empty `DATABASE_FILENAME=` into `.env`, then
-   tries to open the project directory as a database and dies with
-   `SqliteError: unable to open database file`.
-5. **One Strapi project per WordPress site.** Entries are matched on their WordPress id, and
-   two sites both number their posts from 1. We ran Neuros into a second Strapi on port 1338
-   for exactly that reason.
-
-## The pipeline
-
-The skill runs a fixed sequence with one human checkpoint in the middle:
-
-```
-export  →  analyze  →  review config  →  generate  →  migrate  →  verify
-(code)     (code)      (you + Claude)    (code)       (code)      (code)
-```
-
-Each step writes a file the next one reads, so you can stop, look at the file, and re-run any
-step on its own.
-
-### 1. Set up the engine
-
-```bash
-cp -R templates/migrate ./migrate && cd migrate
-npm install
-cp .env.example .env
-```
-
-Fill in `.env`: `WP_URL`, `WP_USER` (your WordPress login name, not the label you gave the
-application password), `WP_APP_PASSWORD`, `STRAPI_URL`, and `STRAPI_API_TOKEN`. Get the Strapi
-token from Settings, API Tokens, Create new API Token, Full access.
-
-### 2. Export
-
-```bash
-node export.js                 # --download-media to keep a local copy of every file
-```
-
-This snapshots every post type, taxonomy, author, and media record into
-`wp-export/export.json`. Everything after this point reads the snapshot, so WordPress can be
-slow, remote, or switched off on migration day.
-
-The export tells you whether the helper plugin is active and which hidden types it had to
-expose. It also exports your menus, which do get migrated, and counts comments, which do not.
-
-### 3. Analyze
-
-```bash
-node analyze.js                # --format markdown to store bodies as Markdown instead of Blocks
-```
-
-This reads the snapshot and prints a plan: every content type, every field, and the Strapi type
-proposed for it. Judgment calls are marked with `⚑`. It writes two files alongside:
-`migration.config.json`, which drives everything downstream, and `migration-plan.md`, the same
-plan as a document — each type with its entry count, a table of every field and what it becomes,
-the custom fields it chose to drop and why. The terminal scrolls away; the document is something
-you can reread, or put in a pull request for someone else to check.
-
-WordPress's fixed fields are mapped by rule: title, body, excerpt, featured image, author,
-taxonomies, parent, dates. Custom fields are guessed from their values, which is where the
-flags come from.
-
-Each line of the plan looks like this:
-
-```
-■ Service  (postType neuros_service, 21) → api::service.service  /api/services  [body: dynamic-zone]
-```
-
-### 4. Review the config
-
-This is the gate, and it is the step worth slowing down for. Read `migration-plan.md` first —
-it is the plan in prose — then edit the config, which is a plain JSON file:
-
-```json
-{
-  "source": { "url": "http://neuros.local", "export": "wp-export/export.json" },
-  "content": { "format": "blocks", "shortcodes": "strip", "uploadExternalImages": true },
-  "types": {
-    "service": {
-      "source": { "kind": "postType", "slug": "neuros_service" },
-      "singularName": "service",
-      "pluralName": "services",
-      "displayName": "Service",
-      "urlPattern": null,
-      "bodyMode": "dynamic-zone",
-      "fields": {
-        "title": { "type": "string", "from": "title", "transform": "text" },
-        "slug": { "type": "uid", "targetField": "title", "from": "slug", "transform": "slug" },
-        "content": { "type": "dynamiczone", "components": [], "from": "content", "transform": "sections" },
-        "wpId": { "type": "integer", "from": "id", "transform": "raw" }
-      },
-      "ignoredMeta": {
-        "_elementor_data": "Elementor layout JSON (see references/page-builders.md)"
-      }
-    }
-  }
-}
-```
-
-Five things to check:
-
-- **`bodyMode` per type.** `blocks` for prose, `dynamic-zone` for page-builder pages,
-  `markdown` when tables matter more than structure. The analyzer proposes it from evidence;
-  you confirm it.
-- **`fields`.** Rename anything awkward, delete what you do not want.
-- **`ignoredMeta`.** Keys the analyzer dropped as theme settings. Read this list. If something
-  in it was actually content, move it back into `fields`.
-- **`urlPattern`.** Leave it `null` to keep WordPress's URLs, or set `/blog/{slug}` and get a
-  `redirects.json` for every path that changes. Some slugs change whether you ask or not — a
-  Strapi uid has to be ASCII and unique per type, so accented slugs are transliterated and
-  colliding ones suffixed — and those get a redirect either way. That is the case worth
-  catching, because it is how a migration quietly loses its inbound links.
-- **Pages that duplicate a collection.** Your "work" page probably lists the same projects you
-  just migrated as a collection, as copy, with nothing connecting the two. Strapi's own
-  reference project models a list section as a heading plus a relation. The plan flags where
-  that applies — both demo sites do it, Neuros on 34 pages — and leaves the decision to you,
-  because deciding that a paragraph *is* a particular entry is not something a tool should
-  guess at.
-
-![The Our Work page on Northfield Studio, listing six projects as links with a short description after each one.](images/wp-work.png)
-
-*The page the last point is about. Those six projects are also six `portfolio_item` entries, and
-nothing in the migrated page knows that. The plan flags it; what to do about it is a modelling
-decision, so the tool leaves it to you.*
-
-Editing this file costs minutes. Re-running a migration you got wrong costs a lot more.
-
-### 5. Generate the Strapi schema
-
-```bash
-node generate.js --out ../my-strapi          # --force to overwrite existing types
-```
-
-This writes content types and any components the config needs. It detects whether your project
-is TypeScript or JavaScript from `tsconfig.json`, because a TypeScript build silently drops
-stray `.js` files and the routes then 404. Content types that already exist are left alone
-unless you pass `--force`.
-
-`strapi develop` reloads on its own when the files appear. Do not restart it.
-
-### 6. Migrate and verify
-
-```bash
-node migrate.js --dry-run     # converts everything, writes previews, touches nothing
-node migrate.js               # --only post,page and --limit 5 while you iterate
-node verify.js
-```
-
-`--dry-run` writes each entry's payload to `wp-export/preview/<type>/<slug>.json` so you can
-read what would be created.
-
-Both commands start with a preflight, which refuses to begin rather than half-migrate. It
-checks the config for relations pointing at types nobody defined, dynamic zones naming
-components that do not exist, and unknown transforms; then it asks Strapi whether it is
-actually serving every type the config expects, which catches the most common mistake of all —
-`generate.js` ran, but Strapi had not reloaded — and whether the token can read them. Every
-problem is reported at once, before anything is written.
-
-The real run happens in two passes. Pass 1 creates every entry with its scalar fields, rich
-text, and media. Pass 2 wires up relations. It has to be two passes, because a relation needs
-the target entry to exist first. Entries are matched on their WordPress id *and* their source
-site, so re-running updates instead of duplicating, and one Strapi can hold migrations from
-several WordPress sites without one site's post 42 overwriting another's.
-
-Your menus are written after pass 1, once every entry has its new URL, so the navigation points
-at the migrated content rather than back at WordPress.
-
-Real cutovers are rarely one migration. People keep publishing while you work, so
-`--since 2026-01-01` narrows a run to what WordPress says changed after a date. Only post types
-can be filtered — terms and users carry no modification date, so they always run, because
-skipping them would create a post whose new category was never made — and an entry with no date
-is migrated rather than skipped. Slugs and links are still computed from the whole set, so
-nothing shifts underneath the content you already moved.
-
-`verify.js` then compares Strapi against the export: counts per type, entries whose fields
-still contain the old WordPress host, and media fields that had a value in WordPress but are
-empty in Strapi. It exits non-zero on any mismatch.
-
-The run also writes `migration-summary.md`, which is the one to read first. It says what moved,
-what failed and where, and groups every warning by kind with a sentence explaining what that
-kind means — `table-flattened ×4` is only useful if you already know what it implies — then
-names the entries behind each one. The JSON report keeps everything; the summary tells you
-where to look.
-
-## The trap that costs you half the site
-
-WordPress shows a post type at `/wp-json/wp/v2/` only if it was registered with
-`show_in_rest => true`. It shows a custom field only if it was registered with
-`register_post_meta()`. Commercial themes routinely do neither, and nothing tells you.
-
-On the two test sites:
-
-- **Neuros:** four of its five custom post types (`neuros_project`, `neuros_team_member`,
-  `neuros_vacancy`, `neuros_service`) are invisible to the REST API. So is every Meta Box
-  field.
-- **Northfield:** the Team post type is hidden, and the projects' ACF field group has *Show in
-  REST API* switched off. That is ACF's default. The fields are in the database and visible in
-  WP Admin, and absent from the API.
+# How to migrate a WordPress site to Strapi with Claude Code
+
+**TL;DR**
+
+- A Claude Code skill reads your WordPress site through its REST API, works out matching Strapi
+  v5 content types, and writes a migration you review before anything moves.
+- You do not run the scripts. You open the project in Claude Code and describe your site. Claude
+  runs each step and stops in the middle to show you what it plans to build.
+- The biggest risk is invisible. WordPress hides post types and custom fields from its own REST
+  API unless somebody switched them on. A migration can finish with no errors and still leave
+  half your site behind.
+- Practise on a throwaway site first. This repo builds one for you in about a minute, with the
+  hard parts already in it.
+- We ran the skill against two real sites, one built for this repo and one commercial theme's
+  demo content. Everything below is what those runs produced.
+
+We will go through what a WordPress migration actually involves, what to expect on your own
+site, and how to run one with Claude Code. The demo site here is a practice ground. The goal is
+that you can do this to a site you care about.
+
+## What a migration actually moves
+
+A WordPress site keeps its content in two places at once. There is the content itself: a post
+title, the words in the body, a featured image, which category it belongs to. Then there is
+everything the theme adds on top: the layout, the colours, the widget in the sidebar, the
+section order on the home page.
+
+Strapi holds the first kind. It does not hold the second. So a migration is not a copy. It is a
+sorting job, and the sorting is the part that takes judgement.
+
+Four questions decide how yours will go. Answer them before you start.
+
+**What content types does the site actually have?** Not what the menu shows. WordPress calls
+these post types. Posts and Pages come as standard. A plugin or theme can register more:
+Services, Team, Projects, Vacancies. Each one becomes a collection type in Strapi.
+
+**Which fields carry content, and which carry presentation?** A field called `client_name` is
+content. A field called `header_background_colour` is not. Both arrive through the same channel
+and look identical in the database. Sorting them is the main decision you will make.
+
+**How were the pages built?** A page written in the block editor is text with some structure.
+A page built with Elementor is a layout description. Those two need different treatment, and
+mixing them up is how you end up with a wall of flattened HTML in your new CMS.
+
+**Which URLs have to keep working?** Anything with inbound links. If your posts live at
+`/2019/05/our-kitchen/` today and you move them to `/blog/our-kitchen/`, something has to
+redirect.
+
+## What to anticipate on your own site
+
+These are the five things that cost the most time on the two sites we migrated. Each one is
+worth checking before you begin.
+
+### Content WordPress hides from its own API
+
+WordPress only shows a post type at `/wp-json/wp/v2/` if whoever registered it passed
+`show_in_rest => true`. The same applies to custom fields: they appear only if somebody called
+`register_post_meta()` with that flag. Both default to off. That default is reasonable, because
+nobody wants private data published by accident. The effect is that the API describes what
+somebody remembered to expose, not what your site contains.
+
+On the two sites we tested:
+
+- **Neuros**, a commercial ThemeForest theme: four of its five custom post types
+  (`neuros_project`, `neuros_team_member`, `neuros_vacancy`, `neuros_service`) are invisible to
+  the REST API. So is every Meta Box field.
+- **Northfield**, built from free plugins: the Team post type is hidden, and the projects' ACF
+  field group has *Show in REST API* switched off. That is ACF's default setting.
+
+Here is what those hidden fields look like when they are working:
 
 ![A Riverbend Coffee Roasters project page showing sections titled The challenge, Our approach, a three-image gallery, and Results listing wholesale orders up 40 per cent.](images/wp-project.png)
 
-*This is what the hidden fields look like when they are working. The challenge, the approach,
-the gallery and the results are all ACF fields on a `portfolio_item`, rendered happily on the
-front end — and absent from `/wp-json/wp/v2/portfolio_item` until the helper plugin exposes
-them.*
+The challenge, the approach, the gallery and the results on that page are all ACF fields. They
+render happily on the front end. Ask `/wp-json/wp/v2/portfolio_item` for them and they are not
+there.
 
-A migration that trusts what the API shows it would have moved either site "successfully" and
-lost roughly half of it, with no error anywhere.
+A migration that trusts the API would move either site with no errors and lose roughly half of
+it. Nothing would warn you.
 
-The fix is a temporary must-use plugin. A must-use plugin is a PHP file in
-`wp-content/mu-plugins/` that WordPress loads automatically, with nothing to activate.
-`strapi-migration-helper.php` does three things:
+**How to check:** open `http://your-site.local/wp-json/wp/v2/types` in a browser. Compare that
+list against the post types in your WP Admin menu. Anything in the menu but not in the JSON is
+hidden.
 
-1. Turns `show_in_rest` on for public post types and taxonomies that opted out.
-2. Returns every custom field on an entry as `migration_meta`, to logged-in editors only.
-3. Registers `/wp-json/strapi-migration/v1/info`, so the export can report what it had to
-   expose:
+**What to do:** the skill ships a temporary plugin,
+`templates/wordpress/strapi-migration-helper.php`. Copy it into `wp-content/mu-plugins/`.
+A must-use plugin is a PHP file WordPress loads automatically, with nothing to activate. This
+one switches `show_in_rest` on for public types that opted out, and returns every custom field
+on an entry as `migration_meta` to logged-in editors. Delete it when the migration is done.
 
-   ```json
-   {"version":"1.0.0","forced_post_types":["team"],"forced_taxonomies":["department"]}
-   ```
+### Pages built with a page builder
 
-On Neuros that list was the four hidden post types and their taxonomies. The plugin changes
-nothing on the front end. Delete it when the migration is done.
+For an Elementor page, the `content.rendered` field the API returns is Elementor's rendered
+output: a deep nest of `<div class="elementor-...">` wrappers. The structure you can see on
+screen lives somewhere else, in a post meta field called `_elementor_data`, stored as JSON.
 
-## How the content is shaped in Strapi
-
-Strapi's **Blocks** field is its native rich-text editor. The value is a JSON array that Strapi
-validates on write, and the list of node types it accepts is short:
-
-| Allowed | Not allowed |
-|---|---|
-| `paragraph`, `heading` (1-6), `list` (nesting is fine), `quote`, `code`, `image` | tables, dividers, embeds, galleries, buttons, columns |
-| inline `text` with bold, italic, underline, strikethrough and code, plus `link` | anything else |
-
-Two rules bite in real content. An `image` node must carry the entire media record, not just a
-URL, which is why files are uploaded before any body is converted. And link URLs must be
-absolute `http(s)`, `mailto:`, `tel:`, `ftp:`, or start with `/`. An in-page anchor like `#why`
-is rejected, so it is written out as plain text instead.
-
-Measured on the two sites: tables flatten to one paragraph per row (4 entries on Northfield),
-YouTube embeds and iframes become plain links (2 entries), galleries become consecutive image
-blocks (4 entries), horizontal rules are dropped. Every one of those is reported as a warning
-naming the entry, so nothing disappears quietly. The Markdown mode (`--format markdown`) keeps
-tables, which is the reason that mode exists.
-
-### Page-builder pages get components instead
-
-For an Elementor page, the `content.rendered` the API returns is Elementor's rendered HTML: a
-deep nest of `<div class="elementor-...">` wrappers. The real structure is in the
-`_elementor_data` post meta, as JSON describing sections and widgets.
-
-Flattening the rendered HTML gives you the words in the right order and throws the layout away.
-That is fine for an article and poor for a landing page, which is what people build with page
+If you flatten the rendered HTML you get the words in the right order and lose the layout. That
+is fine for an article. It is poor for a landing page, which is what people build with page
 builders.
 
-So there is a second lane. A **component** in Strapi is a reusable group of fields stored
-inside a parent entry. A **dynamic zone** is an ordered list of mixed components, so an editor
-can compose a page from varied sections. When a type's entries are mostly builder-built, the
-analyzer proposes `bodyMode: "dynamic-zone"`, reads Elementor's own JSON, and maps each widget
-to a component:
+So the skill has two lanes, chosen per content type:
 
-| Elementor widget | Component |
-|---|---|
-| `heading`, `text-editor` | merged into one `sections.rich-text` per section |
-| `image` | `sections.image` |
-| `icon-box`, `image-box` | `sections.feature` |
-| `button` | `sections.cta` |
-| `testimonial` | `sections.quote` |
-| `video` | `sections.embed` |
-| first section with a heading plus an image or button | `sections.hero` |
-| anything else | `sections.rich-text` from its text settings, or skipped and counted |
+```mermaid
+flowchart TD
+    Body["A WordPress body"] --> Q{"Mostly built with<br/>a page builder?"}
+    Q -->|no| Blocks["Blocks field<br/>(paragraphs, headings, lists, images)"]
+    Q -->|yes| EL["_elementor_data<br/>(the builder's own JSON)"]
+    EL --> Zone["Dynamic zone<br/>of sections.* components"]
+```
 
-The fallback is the part that matters. An unknown widget degrades to rich text instead of
-vanishing, and unknown widget types are counted by name in the report.
+Two Strapi terms there. A **component** is a reusable group of fields stored inside an entry: a
+heading plus an image plus a button, say. A **dynamic zone** is an ordered list of mixed
+components, so an editor can build a page out of varied sections.
 
-Which lane each type got, and what came out:
+The skill reads Elementor's JSON and maps each widget to a component. A `heading` and a
+`text-editor` merge into one rich-text section. An `image` becomes an image section. A
+`testimonial` becomes a quote. Anything it does not recognise degrades to rich text rather than
+disappearing, and gets counted by name in the report so you can see what it did not know.
 
-| Site | Blocks | Dynamic zone |
+**How to check:** look for `_elementor_data` in your post meta, or just open a page in WP Admin
+and see whether it opens in Elementor.
+
+### Custom fields, and the shapes they arrive in
+
+ACF and Meta Box both store values as ordinary post meta, which is a table of strings. What
+comes back needs interpreting:
+
+| What you see | What it is | What it should become |
 |---|---|---|
-| Northfield | posts, services, team, testimonials, projects | pages (2 of 8 are Elementor, so we opted in by hand at the review step) |
-| Neuros | posts, projects, team members, vacancies | pages (35 of 43), services (21 of 21), case studies (8 of 8), proposed automatically |
+| `"20240415"` | a date picker | a date, not a number |
+| `["78","80"]` | an ACF relationship | a relation, resolved through the WordPress ids |
+| `857` on a key like `hero_image` | an attachment id | a media field |
+| `results_headline`, `results_metric`, `results_summary` | an ACF Group, stored flattened | one component, `results: { headline, metric, summary }` |
+| `["branding", "ui", "strategy"]` | a list of values | a repeatable component |
+| `[["2012 - 2017", "Microsoft Inc.", "..."], ...]` | a Meta Box repeater | a repeatable component, one row per entry |
+| `_reading_time` | ACF's internal bookkeeping | ignored |
 
-| | Northfield | Neuros |
-|---|---|---|
-| Entries with a zone | 7 of 8 pages (the Journal page has no body of its own) | 68 (43 pages, 21 services, 8 case studies) |
-| Sections created | 23 | 913 |
-| Components used | rich-text 11, feature 6, cta 3, hero 1, quote 1, image 1 | rich-text 567, image 317, feature 19, hero 8, quote 2 |
-| Failures | 0 | 0 |
-
-Northfield's home page arrives as hero, rich text, six features, quote, call to action, with
-the hero image attached and every link rewritten to a local path (`/work/`,
-`/services/brand-strategy/`, `/contact/`).
-
-For a site whose pages are mostly words, the dynamic zone buys little over Blocks. For a
-theme-built marketing site it is the difference between a wall of flattened HTML and something
-an editor can work with. How good it gets depends on how many of the theme's widgets the mapper
-recognizes.
-
-## What ACF and Meta Box fields become
-
-ACF (Advanced Custom Fields) and Meta Box are the two common plugins for adding custom fields
-to WordPress. Both store values as ordinary post meta, and both produce shapes that need
-interpreting:
-
-| What you see | What it is | Mapped to |
-|---|---|---|
-| `"20240415"` | a date picker | `date`, tested before the integer rule so it does not become a number |
-| `["78","80"]` | an ACF relationship | `relation`, resolved through the WordPress ids |
-| `857` on a key like `hero_image` | an attachment id | `media`, if that id is in the media library |
-| `results_headline`, `results_metric`, `results_summary` | an ACF **Group**, stored flattened | one component: `results: { headline, metric, summary }` |
-| `["AIX Team"]` | a single value in WordPress's multi-row meta table | unwrapped to `"AIX Team"` — unless the item is itself a row, which means a repeater with one row |
-| `["branding", "ui", "strategy"]` | a list of values | a repeatable component with one `value` field |
-| `[["2012 - 2017", "Microsoft Inc.", "…"], …]` | a Meta Box repeater: positional rows, no field names anywhere | a repeatable component. Columns are named only where the shape is unmistakable (`period`, `url`, `icon`, `description`); anything else keeps its position as `fieldN` for you to rename, because a guessed name that is wrong ends up believed |
-| `_reading_time`, `_related_service` | ACF's internal field-key references | ignored |
+The repeater row is worth a closer look, because it shows where a tool has to stop and ask you.
+Meta Box stores those rows as plain arrays with no field names anywhere. Nothing in the data
+says the first column is a date range and the second is a company. The skill names a column only
+when the shape is unmistakable (a URL, an icon class, a year range, a paragraph of prose) and
+otherwise calls it `field2`, which you rename. A guessed name that is wrong ends up believed.
 
 Theme settings arrive through the same channel and are not content. Neuros stores about 50
-presentation keys per entry: `header_*`, `footer_*`, `page_title_*`, border radii. The
-Inspiro theme on Northfield adds `inspiro_hide_title`. The analyzer drops keys that look like
-layout settings, keys starting with `_`, and keys whose value is identical on every entry. It
-lists what it dropped in `ignoredMeta` so you can pull one back if it was content after all.
-On the Neuros project type that was 67 ignored keys against 17 kept.
+presentation keys per entry: `header_*`, `footer_*`, `page_title_*`, border radii. The skill
+drops keys that look like layout settings, keys starting with `_`, and keys whose value is
+identical on every entry, then lists everything it dropped so you can pull one back if it was
+content after all. On the Neuros project type that was 67 dropped against 17 kept.
 
-## What the runs produced
+### Files Strapi will not accept
 
-**Northfield Studio.** 12 content types generated, every entry migrated, verified clean:
+Strapi refuses SVG uploads unless you allow the type in Settings, Media Library, Upload. Every
+logo on the Neuros theme hit this. Thirteen images stayed as WordPress URLs inside twelve pages,
+which means the new site would have loaded its own logo from the old CMS.
+
+**What to do:** allow the type in Strapi before you migrate, convert the files, or pass
+`--skip-types svg` to stop the migration attempting them at all. Whichever you choose, the run
+tells you once, names the type and gives the fix, rather than repeating the same error per file.
+
+### URLs that change without you asking
+
+Leave `urlPattern` at `null` and the skill keeps your WordPress paths, so nothing needs
+redirecting. Two things still change on their own. A Strapi uid has to be ASCII, so an accented
+slug gets transliterated. It also has to be unique per type, so a colliding slug gets a suffix.
+Both cases produce a redirect in `redirects.json`, because those are exactly the URLs a
+migration loses quietly.
+
+## How the skill works
+
+Six steps. Five of them are code. One is you.
+
+```mermaid
+flowchart LR
+    A[export] --> B[analyze]
+    B --> C{{review config}}
+    C --> D[generate]
+    D --> E[migrate]
+    E --> F[verify]
+    style C fill:#4b45e0,stroke:#4b45e0,color:#ffffff
+```
+
+1. **export** reads your WordPress site through the REST API and writes everything to
+   `wp-export/export.json`. From here on nothing touches WordPress, so the site can be slow,
+   remote, or switched off.
+2. **analyze** reads that file and works out what Strapi types would match. It writes
+   `migration.config.json`, which drives everything after it, and `migration-plan.md`, which is
+   the same plan written for a person.
+3. **review** is the gate. You read the plan and change the config.
+4. **generate** writes the Strapi content types and components.
+5. **migrate** moves entries, media and relations in two passes. Entries first, then relations,
+   because a relation needs its target to exist.
+6. **verify** compares Strapi against the export and tells you what does not match.
+
+Each step writes a file the next one reads, so you can stop anywhere, look at the file, and run
+one step again without repeating the others.
+
+You do not type those commands. Claude runs them, and the point of the review step is that it
+stops and waits for you.
+
+## Set up a practice migration
+
+Do this on the demo site before you do it on anything you care about. It takes about ten
+minutes and it teaches you what the review step feels like.
+
+### 1. Build the demo WordPress site
+
+Install [Local](https://localwp.com) and create a blank WordPress site. Install the Inspiro
+theme and four free plugins: Elementor, WPZOOM Portfolio, Custom Post Type UI, and Advanced
+Custom Fields. Then clone this repo, upload the `northfield-demo` plugin from `wordpress/`, and
+go to Tools, Northfield Demo, Create demo content.
+
+![The Northfield Studio home page: a dark navigation bar, the headline "Brand, web and product design for independent businesses", and a photograph of a studio desk.](images/wp-home.png)
+
+That is Northfield Studio: a fictional design agency with 8 pages, 9 posts, 5 services, 4 team
+members, 4 testimonials, 6 projects, 30 images and 26 terms. It has the hard parts on purpose.
+A post type hidden from the API. ACF fields hidden from the API. A classic-editor post full of
+shortcodes. A draft with no slug. A scheduled post. Links to a domain that no longer exists.
+
+Copy `skills/wordpress-to-strapi-migration/templates/wordpress/strapi-migration-helper.php` into
+`wp-content/mu-plugins/`, then create an application password under Users, Profile, Application
+Passwords. An application password is a separate password WordPress accepts for API requests.
+Without one you get published content only, and no custom fields.
+
+### 2. Create a Strapi project
+
+```bash
+npx create-strapi-app@latest my-strapi --no-run --skip-cloud --typescript \
+  --dbclient sqlite --dbfile .tmp/data.db
+```
+
+Pass `--dbfile`. Without it Strapi writes an empty `DATABASE_FILENAME=` into `.env`, then tries
+to open the project folder as a database and stops with
+`SqliteError: unable to open database file`.
+
+Start it with `npm run develop`, create your admin user, then go to Settings, API Tokens, Create
+new API Token and choose Full access. Keep that token.
+
+### 3. Open the repo in Claude Code and ask
+
+The skill lives at `.claude/skills/wordpress-to-strapi-migration/`, so Claude Code finds it when
+you open this repo. To use it on another project, copy that folder into `~/.claude/skills/`.
+
+Then describe your situation:
+
+```
+Migrate my WordPress site at http://northfield.local into the Strapi project
+at ./my-strapi, running on http://localhost:1337. My WordPress user is paul and
+the application password is in migrate/.env. Start with a dry run.
+```
+
+Claude copies the engine, installs it, fills in the environment file, and runs the export and
+the analyze step. Then it stops.
+
+### 4. Read the plan before anything is written
+
+This is the part worth slowing down for. Open `migration-plan.md`. It lists every content type
+with its entry count, a table of every field and what it will become, the custom fields it chose
+to drop and why, and the decisions worth a second look.
+
+Five things to check:
+
+- **`bodyMode` per type.** `blocks` for prose, `dynamic-zone` for page-builder pages, `markdown`
+  if tables matter more than structure. The analyzer proposes one from the evidence. You confirm
+  it.
+- **Fields.** Rename anything awkward. Delete what you do not want.
+- **Dropped keys.** If something in that list was actually content, move it back.
+- **`urlPattern`.** Keep WordPress's URLs, or set `/blog/{slug}` and take the redirects.
+- **Pages that repeat a collection.** The plan flags these:
+
+![The Our Work page on Northfield Studio, listing six projects as links with a short description after each one.](images/wp-work.png)
+
+Those six projects are also six `portfolio_item` entries. The page holds them as copy, and
+nothing connects the two. Strapi's own reference project, LaunchPad, models a list section as a
+heading plus a relation to the collection. The plan tells you where this applies. It does not
+rewrite anything, because deciding that a paragraph *is* a particular entry is a modelling
+choice, and a confident wrong guess replaces real page content with a link to the wrong thing.
+
+You can change the config by hand, or say what you want:
+
+```
+The team specialties field should be a relation to a Tag collection, not a
+repeatable component. And use /blog/{slug} for posts.
+```
+
+### 5. Run it, then check what happened
+
+Tell Claude to continue. It generates the Strapi types, waits for Strapi to reload, runs the
+migration and then the verify step.
+
+Before it writes anything it runs a preflight, which stops the run rather than half-finishing
+it. It catches relations pointing at types nobody defined, dynamic zones naming components that
+do not exist, unknown transforms, content types Strapi is not serving yet (usually generate ran
+but Strapi has not reloaded), and a token without full access.
+
+Two files land at the end. `migration-report.json` has everything, for grepping.
+`migration-summary.md` is the same run written for a person: what moved, what failed with the id
+and slug of each entry, files that could not be migrated, and the warnings grouped by kind. Each
+kind gets a sentence explaining what it means, because `table-flattened ×4` only helps if you
+already know what it implies. Read the summary, then go and look at what it names.
+
+## What the two runs produced
+
+Northfield: 12 content types, every entry migrated, verified clean.
 
 ```
 ┌────────────────┬───────────┬────────┬─────────────┬──────────────┬─────┐
 │ (index)        │ wordpress │ strapi │ oldHostRefs │ missingMedia │ ok  │
 ├────────────────┼───────────┼────────┼─────────────┼──────────────┼─────┤
-│ author         │ 4         │ 4      │ 0           │ 0            │ '✓' │
-│ category       │ 7         │ 7      │ 0           │ 0            │ '✓' │
-│ tag            │ 8         │ 8      │ 0           │ 0            │ '✓' │
-│ industry       │ 5         │ 5      │ 0           │ 0            │ '✓' │
-│ department     │ 3         │ 3      │ 0           │ 0            │ '✓' │
-│ portfolio      │ 5         │ 5      │ 0           │ 0            │ '✓' │
 │ post           │ 9         │ 9      │ 0           │ 0            │ '✓' │
 │ page           │ 8         │ 8      │ 0           │ 0            │ '✓' │
 │ service        │ 5         │ 5      │ 0           │ 0            │ '✓' │
 │ team           │ 4         │ 4      │ 0           │ 0            │ '✓' │
 │ testimonial    │ 4         │ 4      │ 0           │ 0            │ '✓' │
 │ portfolio-item │ 6         │ 6      │ 0           │ 0            │ '✓' │
+│ author         │ 4         │ 4      │ 0           │ 0            │ '✓' │
+│ category       │ 7         │ 7      │ 0           │ 0            │ '✓' │
 └────────────────┴───────────┴────────┴─────────────┴──────────────┴─────┘
 ```
 
-19 warnings, 0 failures. Three warnings are a deliberately broken image in the legacy post,
-hotlinked from a domain that no longer exists, which is what should happen rather than a silent
-drop. The flagship post arrived with 18 blocks, its author, both categories, three tags, the
-featured image and the sticky flag. The project entries carry the ACF fields the REST API had
-hidden: client, year, launch date, hero image, results, and both linked services.
+19 warnings, 0 failures. The project entries carry the ACF fields the REST API had hidden:
+client, year, launch date, hero image, results, and both linked services.
 
-**Neuros.** 13 content types, 343 entries and terms created, 204 media files uploaded, 0
-failures, 156 warnings. Every count matches the export. Twelve of the 13 types verify clean.
-On the first run `verify.js` flagged 12 pages and 5 projects for still containing the old
-WordPress host. Two specific problems, both worth knowing before you run a real migration:
+Neuros: 13 content types, 343 entries and terms, 204 media files, 0 failures, 156 warnings.
+Every count matches the export. Its pages, services and case studies went into dynamic zones and
+produced 913 sections. Northfield's 8 pages produced 23.
 
-1. **Strapi rejects SVG uploads by default.** Every attempt to upload the theme's logos
-   returned `File type 'image/svg+xml' is not allowed`, so 13 images stayed as WordPress URLs
-   inside 12 pages. The new site would have loaded its own logo from the old CMS. Allow the
-   type in Strapi's upload settings, or convert the files, before migrating a theme that uses
-   SVG. The migration now drops a refused image and reports it as `section-image-dropped`
-   instead of leaving the old URL behind, which is why those pages verify clean in the second
-   run further down. It also names the refused type once with the fix rather than repeating
-   Strapi's message per file, and `--skip-types svg` gives up on the type before spending a
-   download on it — on this export that is 18 SVGs attempted, or none.
-2. **A media caption that quotes the old URL looks like a leftover.** Five projects were
-   flagged for containing the WordPress host. The file had migrated fine: the field holds an
-   attachment id, it became a media field, and the MP3 is in the Strapi library. The old URL
-   is inside the *attachment's caption*, because that is what the caption says in WordPress.
-   The migration was right and the check was too blunt. Worth knowing, because you will chase
-   this one before you find it.
-
-Neither is a failure of the content model. Every entry, term, relation and featured image
-arrived. Both are the kind of thing that only shows up when you check.
-
-After fixing those, every type on both sites verifies clean. `verify.js` now reports two
-different things separately: content still pointing at WordPress, which fails the check, and
-a URL sitting inside a media caption, which is just what the caption says. The migration also
-prints every file it could not move, with the reason:
-
-```
-2 file(s) could not be migrated (listed under "media" in migration-report.json):
-  http://neuros.local/wp-content/uploads/2024/02/Logo.svg
-    POST /api/upload -> 400 File type 'image/svg+xml' is not allowed
-```
-
-Two files rather than thirteen, because each file is attempted once and those two logos were
-used in thirteen places.
-
-The other warnings from that first run, with every body going into a Blocks field:
-
-| Warning | Count | What happened |
-|---|---|---|
-| `page-builder` | 53 | Elementor entries flattened to rich text |
-| `media-player` | 61 | an audio player reused across Elementor pages became a link |
-| `iframe` | 2 | embedded frames became links |
-| `possible-shortcode` | 1 | `[woocommerce_my_account]`, on a site without WooCommerce installed |
+Two things only showed up because we checked. The SVG refusal described earlier accounted for
+twelve of the flagged pages. The other five were a false alarm: `verify.js` reported five
+projects as still containing the old WordPress host, and the file had migrated correctly. The
+old URL was sitting inside the attachment's caption, because that is what the caption says in
+WordPress. The migration was right and the check was too blunt, so the check now counts those
+separately.
 
 ## What does not come across
 
-Say this part out loud before you promise anyone a date.
-
-- **Tables, dividers, embeds and galleries inside Blocks.** Blocks has no node for them. Tables
-  flatten to paragraphs, galleries become consecutive images, horizontal rules are dropped, and
-  embeds become links — links that keep the embed's own description, though: its title or
-  caption, else the provider ("View on YouTube"), else the file name, because a reader handed
-  `maps.google.com/maps?q=…` has been told nothing. Use the Markdown mode to keep tables, or the
-  dynamic zone to keep the structure.
+- **Tables, dividers and galleries inside a Blocks field.** Blocks has no node for them. Tables
+  flatten to one paragraph per row, galleries become consecutive images, horizontal rules are
+  dropped. Use the Markdown format to keep tables, or a dynamic zone to keep the structure.
+- **Embeds, as embeds.** An iframe or a video player becomes a link. The link keeps the embed's
+  own description: its title, else its caption, else the provider name, else the file name.
 - **Comments.** Counted and reported, not migrated. Strapi has no built-in comments. Use a
-  plugin, or model a `comment` collection with a relation to the entry.
-- **Menu nesting, as nesting.** Menus themselves do migrate, into a `navigation` single type.
-  But a Strapi component cannot contain itself, so items are a flat list where each one carries
-  the id of its parent, rather than components nested inside components. Any depth survives;
-  your front end does the nesting.
-- **WooCommerce products.** Skipped by default. Prices, variations and stock live in
-  WooCommerce's own tables, which means the WooCommerce REST API, not this.
-- **SVG files.** Rejected by Strapi's upload settings unless you allow the type. The migration
-  now says so once — naming the type and the three ways out — instead of repeating Strapi's
-  message per file, and `--skip-types svg` stops it attempting them at all.
-- **Theme widgets with no text of their own.** On Neuros, a fixed list of known Elementor
-  widgets skipped 441 of them. Making the fallback read any prose-looking setting cut that to
-  172. The rest are genuinely structural: team grids, icon lists, carousels that pull from a
+  plugin, or add a `comment` collection with a relation to the entry.
+- **Menu nesting, as nesting.** Menus do migrate, into a `navigation` single type. A Strapi
+  component cannot contain itself, so items are a flat list where each one carries the id of its
+  parent. Any depth survives. Your front end does the nesting.
+- **WooCommerce products.** Prices, variations and stock live in WooCommerce's own tables, which
+  means the WooCommerce API, not this.
+- **Theme widgets with no text of their own.** Team grids, icon lists, carousels that pull from a
   custom post type. Those are rebuild candidates, and the report names them with counts.
 - **Multilingual content** (WPML, Polylang). Migrate one language, then map the rest onto
   Strapi's i18n yourself.
 
-Two hazards live in the source site rather than in Strapi. The Neuros demo content pointed at
-the theme vendor's server: roughly 4,250 image references and 810 links to
-`demo.artureanec.com`, inside Elementor JSON, post bodies, menus, a Meta Box field, widgets and
-theme settings. Importers do not rewrite those, and `wp search-replace` has to run twice, once
-for plain URLs and once for the JSON-escaped form (`https:\/\/…`) page builders store. And
-importing the same content twice leaves duplicate meta rows, which turn every custom field into
-a two-element array: on our repaired Neuros site, 8,993 of 12,398 (post, key) pairs.
+Two hazards live in the WordPress site rather than in Strapi. Theme demo content often points at
+the vendor's server: the Neuros demo had roughly 4,250 image references and 810 links to
+`demo.artureanec.com`, inside Elementor JSON, post bodies, menus and theme settings. Importers do
+not rewrite those, and `wp search-replace` has to run twice, once for plain URLs and once for the
+JSON-escaped form (`https:\/\/...`) that page builders store. Importing the same content twice
+also leaves duplicate meta rows, which turn every custom field into a two-element array. On the
+repaired Neuros site that was 8,993 of 12,398 post-and-key pairs.
 
-> **This skill is a starting point, not a one-click migration.** I want to be direct about
-> that, because the failure mode here is trusting a green checkmark.
+## Doing it on your own site
+
+> **This skill is a starting point, not a one-click migration.** The failure mode here is
+> trusting a green checkmark.
 >
 > Every site has unknowns. Fields nobody registered for the API. A page builder storing layout
-> somewhere the API never shows you. A plugin someone installed in 2019 and forgot. The skill
-> cannot know about those in advance. What it can do is report honestly: name every entry it
-> was unsure about, count every widget it did not recognize, and tell you which URLs still
-> point at the old server.
+> somewhere the API never shows. A plugin someone installed in 2019 and forgot. The skill cannot
+> know about those in advance. What it can do is report honestly: name every entry it was unsure
+> about, count every widget it did not recognise, and tell you which URLs still point at the old
+> server.
 >
-> So treat migration as a loop, not a command. Run the pipeline. Read what it flagged. Adjust
-> the config. Run it again. Entries are matched on their WordPress id, so re-running updates
-> rather than duplicates, which is what makes the loop cheap.
->
-> Running Claude Code alongside the skill is what makes that loop work. The review step is a
-> conversation: you read the plan together, you say "that field is a date, not an integer" or
-> "these pages should be a dynamic zone", and the config changes. The tool produces evidence.
-> You decide what matters. Neither half is enough on its own.
+> So treat it as a loop. Run the pipeline. Read what it flagged. Adjust the config. Run it again.
+> Entries are matched on their WordPress id and their source site, so re-running updates rather
+> than duplicating, which is what makes the loop cheap.
 
-## Make the skill your own
+A few things change once the site is real.
 
-The skill is a directory of Markdown and scripts, not a binary. Fork it and change it — that
-is the expected way to use it, not a fallback.
-
-The useful seams, roughly in the order people reach for them:
-
-- **`migration.config.json`.** Not code at all. Rename a type, drop a field, change a guessed
-  type, set a `urlPattern`. Most of what looks like a missing feature is a config edit.
-- **The component catalogue** (`lib/components.js`). Ten `sections.*` components ship with it.
-  A component is a table entry plus a mapping rule; adding an accordion or a pricing table is
-  a few lines, and nothing else has to change.
-- **The Elementor widget map** (`lib/sections.js`). Your theme's widgets are not the ones we
-  met. The run reports every widget it skipped, with counts — that report is the to-do list for
-  this file.
-- **The field inference** (`analyze.js`). It guesses Strapi types from WordPress values. If your
-  plugin stores something in a shape it misreads, the fix belongs here and it is testable in
-  isolation.
-- **`SKILL.md`.** What Claude reads. Adding a house rule — "always use a dynamic zone for
-  landing pages", "never migrate the events type" — is a sentence.
-
-## Scaling up to a real migration
-
-Both sites here are small: 36 entries and 30 images, 114 entries and 389 images. Real sites
-are bigger, and a few things change shape at scale.
-
-**Do a dry run first, always.** `--dry-run` converts everything and writes each entry's payload
-to disk without touching Strapi. On a large site this is the cheapest hour you will spend.
+**Do a dry run first.** `--dry-run` converts everything and writes each entry's payload to disk
+without touching Strapi. On a large site that is the cheapest hour you will spend.
 
 **Migrate in slices.** `--only post,page` and `--limit 20` while you are still deciding what the
-content should look like. Entries are matched on their WordPress id and their source site, so
-re-running updates rather than duplicating, which is what makes iteration cheap.
+content should look like.
 
-**Expect the cutover to be two runs.** People keep publishing while you work. `--since` narrows
-a second pass to what changed after a date, so the catch-up run takes minutes.
+**Expect the cutover to be two runs.** People keep publishing while you work. `--since` narrows a
+second pass to what changed after a date, so the catch-up takes minutes. Only post types can be
+filtered, because terms and users carry no modification date, so they always run.
 
-**Watch the media, not the entries.** Entries are fast; files are not. A site with thousands of
-images spends nearly all its time waiting on uploads, and that is where `--skip-types` and the
-upload cache earn their keep — the cache survives restarts, so an interrupted run resumes
-rather than re-uploading.
+**Watch the files, not the entries.** Entries are fast. Files are not. The upload cache survives
+restarts, so an interrupted run resumes rather than re-uploading.
 
-**Know when to stop using this.** If you are moving a site with tens of thousands of entries, or
-you need a repeatable production cutover with rollback, you want purpose-built tooling and a
-staging rehearsal. This skill is for getting a real site into Strapi quickly and understanding
-exactly what happened to it — which is most migrations, but not all of them.
+**Change the skill.** It is a folder of Markdown and scripts. The component catalogue in
+`lib/components.js` is a table entry plus a mapping rule, so adding an accordion or a pricing
+table is a few lines. The Elementor widget map in `lib/sections.js` is where your theme's widgets
+go, and the run reports every widget it skipped with counts, which is the to-do list for that
+file. `SKILL.md` is what Claude reads, so a house rule like "always use a dynamic zone for
+landing pages" is one sentence.
 
-## Try it
+**Know when this is the wrong tool.** If you are moving tens of thousands of entries, or you need
+a production cutover with a rollback plan, you want purpose-built tooling and a staging rehearsal.
 
 Everything here is in
 [github.com/PaulBratslavsky/wordpress-to-strapi-demo](https://github.com/PaulBratslavsky/wordpress-to-strapi-demo):
-the demo site, the skill, the migration scripts, and the full notes from both runs.
+the demo site, the skill, the engine, and the full notes from both runs.
 
-What to do first, in order:
+**Citations**
 
-1. **Build Northfield Studio.** Create a blank site in Local, install the Inspiro theme and
-   four free plugins (Elementor, WPZOOM Portfolio, Custom Post Type UI, Advanced Custom
-   Fields), then upload the `northfield-demo` plugin and click Tools, Northfield Demo, Create
-   demo content. It takes under a minute, and `wp northfield reset` puts it back.
-2. **Export without the helper plugin, then with it.** Compare the two `export.json` files. The
-   Team post type and the project ACF fields appear only in the second one. That difference is
-   the reason the helper exists, and it lands better on your own screen than in a table.
-3. **Run `node analyze.js` and read the plan.** Look at the `⚑` lines and at `ignoredMeta`.
-   Change something in `migration.config.json` and run it again.
-4. **Migrate one entry before you migrate the site.** `node migrate.js --only page --limit 1`,
-   then open it in the Strapi admin. Do this with a page-builder page. It is the fastest way to
-   find out whether the dynamic zone gives you what you want.
-5. **Then point it at your own site.** That is the part the skill was written for.
+- The demo site, the skill and both migration runs: https://github.com/PaulBratslavsky/wordpress-to-strapi-demo
+- Strapi 5 documentation: https://docs.strapi.io
+- Strapi LaunchPad, the reference project for the relation pattern: https://github.com/strapi/LaunchPad
+- WordPress REST API Handbook: https://developer.wordpress.org/rest-api/
+- register_post_type and show_in_rest: https://developer.wordpress.org/reference/functions/register_post_type/
+- register_post_meta: https://developer.wordpress.org/reference/functions/register_post_meta/
+- Must-use plugins: https://developer.wordpress.org/advanced-administration/plugins/mu-plugins/
+- WPGraphQL, if you would rather stay on WordPress and go headless: https://www.wpgraphql.com/
+- Advanced Custom Fields: https://www.advancedcustomfields.com/
+- Meta Box: https://metabox.io/
+- Local, for running WordPress on your machine: https://localwp.com
