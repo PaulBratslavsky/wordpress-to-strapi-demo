@@ -8,6 +8,31 @@ and writes a migration you review before anything moves.
 
 We ran it against two real sites. Everything in this post is what those runs produced.
 
+## Why move from WordPress to Strapi?
+
+WordPress is not the problem. If you run one site, with one theme, and the people editing it
+are happy, stay where you are.
+
+The reasons to move show up when content has to leave the page it was written on:
+
+- **Content is welded to presentation.** A WordPress post is HTML shaped by a theme, and a page
+  built with Elementor is layout JSON describing columns and widgets. Ask for that content in a
+  mobile app, on a kiosk screen, or on a second brand's site, and you are parsing markup to get
+  it back out. Strapi stores fields — a heading is a heading, a price is a number — so one entry
+  serves any number of front ends.
+- **The API is an afterthought.** WordPress shows a post type over REST only if somebody
+  registered it with `show_in_rest`, and a custom field only if somebody registered the meta.
+  Commercial themes routinely do neither, which costs us a whole section further down. In
+  Strapi, a field is in the API because you modelled it.
+- **Types, not strings.** Post meta is a key-value table of strings. A date is a string, a price
+  is a string, a relationship is a string holding an id. Strapi has dates, numbers, media and
+  relations, and it rejects content that doesn't fit the shape you declared.
+- **A smaller surface to keep patched.** Every plugin is code with database access running on
+  every request. Going headless takes the public front end out of PHP entirely.
+
+What you keep is the editing experience. Strapi's admin is still a CMS your writers can use —
+this is not a migration into Markdown files in a Git repo.
+
 ## What you end up with
 
 A Strapi v5 project containing:
@@ -510,6 +535,52 @@ a two-element array: on our repaired Neuros site, 8,993 of 12,398 (post, key) pa
 > conversation: you read the plan together, you say "that field is a date, not an integer" or
 > "these pages should be a dynamic zone", and the config changes. The tool produces evidence.
 > You decide what matters. Neither half is enough on its own.
+
+## Make the skill your own
+
+The skill is a directory of Markdown and scripts, not a binary. Fork it and change it — that
+is the expected way to use it, not a fallback.
+
+The useful seams, roughly in the order people reach for them:
+
+- **`migration.config.json`.** Not code at all. Rename a type, drop a field, change a guessed
+  type, set a `urlPattern`. Most of what looks like a missing feature is a config edit.
+- **The component catalogue** (`lib/components.js`). Ten `sections.*` components ship with it.
+  A component is a table entry plus a mapping rule; adding an accordion or a pricing table is
+  a few lines, and nothing else has to change.
+- **The Elementor widget map** (`lib/sections.js`). Your theme's widgets are not the ones we
+  met. The run reports every widget it skipped, with counts — that report is the to-do list for
+  this file.
+- **The field inference** (`analyze.js`). It guesses Strapi types from WordPress values. If your
+  plugin stores something in a shape it misreads, the fix belongs here and it is testable in
+  isolation.
+- **`SKILL.md`.** What Claude reads. Adding a house rule — "always use a dynamic zone for
+  landing pages", "never migrate the events type" — is a sentence.
+
+## Scaling up to a real migration
+
+Both sites here are small: 36 entries and 30 images, 114 entries and 389 images. Real sites
+are bigger, and a few things change shape at scale.
+
+**Do a dry run first, always.** `--dry-run` converts everything and writes each entry's payload
+to disk without touching Strapi. On a large site this is the cheapest hour you will spend.
+
+**Migrate in slices.** `--only post,page` and `--limit 20` while you are still deciding what the
+content should look like. Entries are matched on their WordPress id and their source site, so
+re-running updates rather than duplicating, which is what makes iteration cheap.
+
+**Expect the cutover to be two runs.** People keep publishing while you work. `--since` narrows
+a second pass to what changed after a date, so the catch-up run takes minutes.
+
+**Watch the media, not the entries.** Entries are fast; files are not. A site with thousands of
+images spends nearly all its time waiting on uploads, and that is where `--skip-types` and the
+upload cache earn their keep — the cache survives restarts, so an interrupted run resumes
+rather than re-uploading.
+
+**Know when to stop using this.** If you are moving a site with tens of thousands of entries, or
+you need a repeatable production cutover with rollback, you want purpose-built tooling and a
+staging rehearsal. This skill is for getting a real site into Strapi quickly and understanding
+exactly what happened to it — which is most migrations, but not all of them.
 
 ## Try it
 
