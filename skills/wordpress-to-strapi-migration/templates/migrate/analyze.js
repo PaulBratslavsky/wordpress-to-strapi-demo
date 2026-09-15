@@ -4,6 +4,7 @@ import { detectPageBuilder } from './lib/html.js';
 import { MediaLibrary } from './lib/media.js';
 import { planMarkdown } from './lib/plan.js';
 import { listShape, wrapsRow } from './lib/repeatable.js';
+import { duplicatedCollections } from './lib/duplication.js';
 
 /**
  * ANALYZE — read the export, print a migration plan, and write a starter
@@ -473,6 +474,63 @@ function main() {
   }
   if (!site.authenticated) flag('export was unauthenticated — only published content; custom fields and drafts are missing');
   for (const [slug, why] of Object.entries(data.stats?.skippedTypes || {})) flag(`${slug} not exported: ${why}`);
+
+  // --- pages that repeat a collection ------------------------------------------
+  // Reported, never rewritten: deciding that a paragraph *is* a given entry is a
+  // modelling call, and a confident wrong guess would replace real page content.
+  const widgetTypesOf = (entry) => {
+    let raw = entry.migration_meta?._elementor_data ?? entry.meta?._elementor_data;
+    if (Array.isArray(raw)) raw = raw[0];
+    if (typeof raw !== 'string' || !raw.trim()) return [];
+    const out = [];
+    const walk = (nodes) => {
+      for (const node of nodes ?? []) {
+        if (node.widgetType) out.push(node.widgetType);
+        walk(node.elements);
+      }
+    };
+    try {
+      walk(JSON.parse(raw));
+    } catch {
+      // Unreadable layout JSON is already reported by the converter.
+    }
+    return out;
+  };
+
+  const postTypes = Object.values(config.types).filter((t) => t.source.kind === 'postType');
+  const titlesOf = (t) =>
+    (data.entries[t.source.slug] ?? []).map((e) => htmlToText(e.title?.rendered || e.title?.raw || '')).filter(Boolean);
+  const duplicates = [];
+  for (const t of postTypes) {
+    const others = postTypes.filter((o) => o !== t).map((o) => ({ name: o.singularName, titles: titlesOf(o) }));
+    if (!others.length) continue;
+    for (const entry of data.entries[t.source.slug] ?? []) {
+      const page = { text: htmlToText(entry.content?.rendered || ''), widgets: widgetTypesOf(entry) };
+      for (const found of duplicatedCollections(page, others)) {
+        duplicates.push({ owner: t.singularName, slug: entry.slug || `#${entry.id}`, ...found });
+      }
+    }
+  }
+  // Grouped by what they duplicate: "12 pages build a service listing" is a decision,
+  // where six page names and a hidden remainder is an inventory.
+  const groups = new Map();
+  for (const d of duplicates) {
+    const key = `${d.owner}|${d.type}|${d.signal}|${d.detail}`;
+    const group = groups.get(key) ?? { ...d, slugs: [] };
+    group.slugs.push(d.slug);
+    groups.set(key, group);
+  }
+  for (const g of groups.values()) {
+    const n = g.slugs.length;
+    const examples = g.slugs.slice(0, 3).map((s) => `"${s}"`).join(', ') + (n > 3 ? ', …' : '');
+    const subject = `${n} ${g.owner} ${n === 1 ? 'entry' : 'entries'} (${examples})`;
+    const advice = `→ relate ${n === 1 ? 'it' : 'them'} to the migrated ${g.type} collection rather than keeping a copy`;
+    flag(
+      g.signal === 'widget'
+        ? `${subject} ${n === 1 ? 'builds' : 'build'} a ${g.type} listing with the ${g.detail} widget ${advice}`
+        : `${subject} ${n === 1 ? 'repeats' : 'repeat'} ${g.type} titles inline ${advice}`
+    );
+  }
 
   // --- report -------------------------------------------------------------------
   console.log(`\nMigration plan for ${site.name} (${site.home}) — body format: ${format}\n`);

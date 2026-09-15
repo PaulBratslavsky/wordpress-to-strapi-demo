@@ -123,6 +123,9 @@ generating anything:
 - **`urlPattern`** — leave `null` to keep WordPress's URLs, or set `/blog/{slug}` and get a
   `redirects.json` for the paths that change.
 - **Relations and types** — singular/plural names, and which taxonomies become collections.
+- **Pages that duplicate a collection** — the plan flags where a page repeats entries it could
+  relate to instead, the way LaunchPad models a list section. Nothing is rewritten: deciding
+  that a paragraph *is* a given entry is yours to make.
 
 Show the plan to the person you're working with. This is the step that decides whether the
 migration is right, and it costs minutes compared with re-running everything.

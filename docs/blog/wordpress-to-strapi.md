@@ -170,7 +170,7 @@ it is the plan in prose — then edit the config, which is a plain JSON file:
 }
 ```
 
-Four things to check:
+Five things to check:
 
 - **`bodyMode` per type.** `blocks` for prose, `dynamic-zone` for page-builder pages,
   `markdown` when tables matter more than structure. The analyzer proposes it from evidence;
@@ -183,6 +183,12 @@ Four things to check:
   Strapi uid has to be ASCII and unique per type, so accented slugs are transliterated and
   colliding ones suffixed — and those get a redirect either way. That is the case worth
   catching, because it is how a migration quietly loses its inbound links.
+- **Pages that duplicate a collection.** Your "work" page probably lists the same projects you
+  just migrated as a collection, as copy, with nothing connecting the two. Strapi's own
+  reference project models a list section as a heading plus a relation. The plan flags where
+  that applies — both demo sites do it, Neuros on 34 pages — and leaves the decision to you,
+  because deciding that a paragraph *is* a particular entry is not something a tool should
+  guess at.
 
 Editing this file costs minutes. Re-running a migration you got wrong costs a lot more.
 

@@ -16,10 +16,10 @@ Priorities are ordered by how much they change the quality of a migration, not b
 > fatal), 2.3 (menus → a navigation single type), 2.5 (redirects for slugs that change), 2.7
 > (caption URLs counted apart from stale content), 3.1 (`wpSite` namespacing), 3.3 (preflight),
 > 3.5 (the written plan file), 4.4 (the readable run summary), 2.6 (refused file types) and
-> 2.4 (what to do about comments), 3.4 (incremental runs), 1.3's repeating lists and 2.2
-> (embeds keep their description), alongside 4.1–4.3.
+> 2.4 (what to do about comments), 3.4 (incremental runs), 1.3's repeating lists, 2.2 (embeds
+> keep their description) and 1.4 (pages that duplicate a collection), alongside 4.1–4.3.
 >
-> **Still open:** 1.4 and 3.2.
+> **Still open:** 3.2 (parallel uploads), which needs a live Strapi to verify.
 
 ---
 
@@ -103,12 +103,34 @@ those are modelling decisions for a human. And a single-row repeater of *named o
 still read as one object, because an ACF image arrives as `[{…}]` and must unwrap to be
 recognised; telling those two apart is guesswork.
 
-### 1.4 Follow LaunchPad's reusable-section pattern
+### 1.4 Follow LaunchPad's reusable-section pattern — **done** (detect and flag)
 
-Strapi's reference project models list-style sections as a component holding a heading plus
-a **relation** to a real collection, rather than duplicating content inline. Where a
-WordPress page embeds a testimonial or FAQ list, prefer a relation to the migrated
-collection over copying the text.
+Strapi's reference project models list-style sections as a component holding a heading plus a
+**relation** to a real collection, rather than duplicating content inline. A migrated WordPress
+page arrives with the opposite: the "work" page holds its portfolio entries as copy, and nothing
+connects that copy to the six entries the migration just created. The new site has the same
+content twice and no way to know it.
+
+The analyzer now notices and says so in the plan. **It never rewrites** — deciding that a given
+paragraph *is* a given entry is a modelling call, and a confident wrong guess would replace real
+page content with a link to the wrong thing.
+
+Two signals, each covering the other's blind spot:
+
+- **Titles** — several of a collection's titles in one page's text. Works whatever built the
+  page. A title must be at least 8 characters and two must match, so "AI" and "ML" cannot count
+  as evidence and a sentence mentioning one project is not a listing.
+- **Widgets** — a page builder's own listing widget, which names the collection outright
+  (`neuros_projects_listing`). Precise, but only exists where a builder was used. Neuros's
+  `neuros_blog_listing` names no collection, and the title signal catches those pages instead;
+  no alias table papers over the gap.
+
+Findings are grouped by what they duplicate, with a count and a few examples, because "8 pages
+build a team-member listing" is a decision where eight page names is an inventory.
+
+*Evidence:* Northfield — `"home"` and `"work"` repeat portfolio-item titles, `"home"` and
+`"services"` repeat service titles, and `"home"` builds a testimonial listing. Neuros — 34
+findings in 8 groups, including 8 pages building a team-member listing and 7 a project listing.
 
 ---
 
