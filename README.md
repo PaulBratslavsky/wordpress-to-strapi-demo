@@ -51,6 +51,22 @@ A free example WordPress site, a Claude Code skill that migrates it to [Strapi](
 
 The skill in [`skills/wordpress-to-strapi-migration/`](skills/wordpress-to-strapi-migration/) reads a site through the [WordPress REST API](https://developer.wordpress.org/rest-api/) and generates matching [Strapi v5](https://docs.strapi.io) content types. It then moves the entries, media and relations into Strapi and reports anything it couldn't convert cleanly.
 
+### Using the skill
+
+A copy lives at `.claude/skills/wordpress-to-strapi-migration/`, so **Claude Code finds it automatically when you open this repo** — nothing to install. To use it on a different project, copy that folder into `~/.claude/skills/` and it is available everywhere.
+
+You don't run the scripts yourself. Open the project in Claude Code and ask, naming your site and your Strapi:
+
+```
+Migrate my WordPress site at http://my-site.local into the Strapi project
+at ./my-strapi (running on http://localhost:1337). The WordPress
+application password is in migrate/.env.
+```
+
+Claude reads the site, proposes matching content types, and stops to show you the plan before anything is written. That review step is the point: you change what it got wrong, then tell it to continue.
+
+> Working on your own site rather than the demo? Read [`SKILL.md`](skills/wordpress-to-strapi-migration/SKILL.md) first — the prerequisites list an application password and a temporary helper plugin, and skipping the helper is how a migration quietly loses half a site.
+
 > **Status:** run end to end against both example sites. See [what we learned](docs/migration-findings.md) and the [improvement plan](docs/skill-improvement-plan.md) for what's built and what's still open.
 
 Treat it as a starting point. Every WordPress site has its own quirks: page builders, custom fields, plugins. Migration works best as an iterative loop: run the skill, review what it flagged, adjust, and run again.
