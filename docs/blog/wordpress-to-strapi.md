@@ -184,21 +184,54 @@ Here is what those hidden fields look like when they are working:
 The challenge, the approach, the gallery and the results on that page are all ACF fields, and
 every one of them is content somebody wrote and would expect to keep.
 
-Here is that entry over the API, on the site as it stands today. Asking for it as an
-authenticated editor, with the helper plugin installed:
+Here is that same entry in three states, taken from the running site.
+
+Ask WordPress for it the way an anonymous client would, which is what a migration sees if you
+skip the application password:
 
 ```
-GET /wp/v2/portfolio_item?context=edit
+GET /wp/v2/portfolio_item?slug=riverbend-coffee-roasters
 
 acf:            []
-migration_meta: client_name, year, website, launch_date, services_provided,
-                hero_image, results_headline, results_metric, results_summary
+migration_meta: not present
 ```
 
-ACF returns an empty array, because *Show in REST API* is off for that field group. Every one of
-those fields reaches the migration through `migration_meta`, which is what the helper adds. Drop
-the helper and that second line is empty too, and the entry arrives in Strapi as a title and a
-body with nothing else attached.
+Nothing. Now ask as an authenticated editor, with the helper plugin installed:
+
+```
+GET /wp/v2/portfolio_item?slug=riverbend-coffee-roasters&context=edit
+
+acf:            []
+migration_meta:
+  client_name:      "Riverbend Coffee Roasters"
+  year:             "2024"
+  launch_date:      "20240415"
+  results_headline: "Wholesale orders up 40%"
+  results_metric:   "+40%"
+  results_summary:  "Measured over the six months after launch."
+```
+
+ACF is still empty, because *Show in REST API* is off for that field group. Every value arrives
+through `migration_meta` instead, which is what the helper adds. And here is the same entry
+after migration, from Strapi:
+
+```
+GET /api/portfolio-items?populate=*
+
+title:      "Riverbend Coffee Roasters"
+year:       2024
+launchDate: "2024-04-15"
+results:    { headline: "Wholesale orders up 40%",
+              metric:   "+40%",
+              summary:  "Measured over the six months after launch." }
+wpId:       419
+wpSite:     "northfield.local"
+```
+
+Three things changed on the way across. `launch_date` was the string `"20240415"` and is now a
+real date. `year` was the string `"2024"` and is now a number. The three loose `results_*` keys
+are one `results` component. And `wpId` with `wpSite` are what make a second run update this
+entry rather than create another one.
 
 **How to check:** open `http://your-site.local/wp-json/wp/v2/types` in a browser. Compare that
 list against the post types in your WP Admin menu. Anything in the menu but not in the JSON is
@@ -478,6 +511,15 @@ separately.
 - **Tables, dividers and galleries inside a Blocks field.** Blocks has no node for them. Tables
   flatten to one paragraph per row, galleries become consecutive images, horizontal rules are
   dropped. Use the Markdown format to keep tables, or a dynamic zone to keep the structure.
+
+Here is one of those tables on the demo site, in a post about colour contrast:
+
+![A blog post on Northfield Studio titled Five Accessibility Fixes You Can Ship This Week, showing a three-column table of text types, minimum contrast ratios and passing examples.](images/wp-post-table.png)
+
+Three rows, three columns, and the ratios only mean anything next to the thing they describe.
+In a Blocks field that becomes three paragraphs. The run reports it as `table-flattened` and
+names the post, so you can decide whether that one is worth `--format markdown` or a dynamic
+zone. Four entries on the demo site hit this.
 - **Embeds, as embeds.** An iframe or a video player becomes a link. The link keeps the embed's
   own description: its title, else its caption, else the provider name, else the file name.
 - **Comments.** Counted and reported, not migrated. Strapi has no built-in comments. Use a
