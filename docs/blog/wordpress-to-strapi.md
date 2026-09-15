@@ -362,8 +362,10 @@ interpreting:
 | `"20240415"` | a date picker | `date`, tested before the integer rule so it does not become a number |
 | `["78","80"]` | an ACF relationship | `relation`, resolved through the WordPress ids |
 | `857` on a key like `hero_image` | an attachment id | `media`, if that id is in the media library |
-| `results_headline`, `results_metric`, `results_summary` | an ACF **Group**, stored flattened | separate fields in these runs; the analyzer now spots the shape and proposes one component |
-| `["AIX Team"]` | a single value in WordPress's multi-row meta table | unwrapped to `"AIX Team"` |
+| `results_headline`, `results_metric`, `results_summary` | an ACF **Group**, stored flattened | one component: `results: { headline, metric, summary }` |
+| `["AIX Team"]` | a single value in WordPress's multi-row meta table | unwrapped to `"AIX Team"` — unless the item is itself a row, which means a repeater with one row |
+| `["branding", "ui", "strategy"]` | a list of values | a repeatable component with one `value` field |
+| `[["2012 - 2017", "Microsoft Inc.", "…"], …]` | a Meta Box repeater: positional rows, no field names anywhere | a repeatable component. Columns are named only where the shape is unmistakable (`period`, `url`, `icon`, `description`); anything else keeps its position as `fieldN` for you to rename, because a guessed name that is wrong ends up believed |
 | `_reading_time`, `_related_service` | ACF's internal field-key references | ignored |
 
 Theme settings arrive through the same channel and are not content. Neuros stores about 50

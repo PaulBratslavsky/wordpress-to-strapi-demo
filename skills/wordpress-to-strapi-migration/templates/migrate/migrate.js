@@ -101,7 +101,9 @@ async function main() {
     let raw = getPath(item, field.from);
     // Mirror analyze.js: a scalar field whose value arrived as a one-item array
     // (or the same value repeated) is that value.
-    if (Array.isArray(raw) && raw.length && field.type !== 'json' && field.type !== 'relation' && !field.multiple) {
+    // A repeating field's outer array IS the list of rows — unwrapping a
+    // single-row repeater would turn its columns into separate rows.
+    if (Array.isArray(raw) && raw.length && field.transform !== 'list' && field.type !== 'json' && field.type !== 'relation' && !field.multiple) {
       const identical = new Set(raw.map((x) => JSON.stringify(x))).size === 1;
       if (raw.length === 1 || identical) raw = raw[0];
     }
@@ -162,6 +164,34 @@ async function main() {
           value[name] = sub.transform === 'number' ? Number(v) : v;
         }
         return Object.keys(value).length ? value : undefined;
+      }
+      case 'list': {
+        // A repeating field: Meta Box stores rows as positional arrays, ACF Pro as
+        // named objects, and a plain list as bare strings. The column names came
+        // from the analyzer and are in migration.config.json to be renamed.
+        const spec = field.list ?? {};
+        const columns = spec.columns ?? [];
+        const keep = (v) => v !== undefined && v !== null && v !== '';
+        const rows = [];
+        for (const row of asArray(raw)) {
+          const out = {};
+          if (spec.kind === 'tuple') {
+            if (!Array.isArray(row)) continue;
+            columns.forEach((col, i) => {
+              if (keep(row[i])) out[col.name] = String(row[i]);
+            });
+          } else if (spec.kind === 'object') {
+            if (!row || typeof row !== 'object' || Array.isArray(row)) continue;
+            for (const col of columns) {
+              const v = row[col.key ?? col.name];
+              if (keep(v)) out[col.name] = String(v);
+            }
+          } else if (keep(row)) {
+            out[columns[0]?.name ?? 'value'] = String(row);
+          }
+          if (Object.keys(out).length) rows.push(out);
+        }
+        return rows.length ? rows : undefined;
       }
       case 'site':
         return sourceHost;

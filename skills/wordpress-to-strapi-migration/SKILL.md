@@ -183,6 +183,7 @@ download on it.
 | Featured image, ACF image, gallery | `media`, uploaded to the library first |
 | Post body | `blocks` (default), `richtext` (Markdown), or a `sections` dynamic zone |
 | ACF / Meta Box / registered meta | typed by value: string, text, integer, boolean, date, email, json, media, relation |
+| Repeating field (Meta Box repeater, list of values) | repeatable component; positional rows are named only where the shape is clear (`url`, `icon`, `period`, `description`), otherwise `fieldN` to rename |
 | ACF relationship / post object | `relation` |
 | Parent page, parent term | self-relation |
 | `publish` / everything else | published / draft, with the original in `wpStatus` |

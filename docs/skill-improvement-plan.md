@@ -16,9 +16,10 @@ Priorities are ordered by how much they change the quality of a migration, not b
 > fatal), 2.3 (menus → a navigation single type), 2.5 (redirects for slugs that change), 2.7
 > (caption URLs counted apart from stale content), 3.1 (`wpSite` namespacing), 3.3 (preflight),
 > 3.5 (the written plan file), 4.4 (the readable run summary), 2.6 (refused file types) and
-> 2.4 (what to do about comments) and 3.4 (incremental runs), alongside 4.1–4.3.
+> 2.4 (what to do about comments), 3.4 (incremental runs) and 1.3's repeating lists,
+> alongside 4.1–4.3.
 >
-> **Still open:** 1.3's repeating lists, 1.4, 2.2 and 3.2.
+> **Still open:** 1.4, 2.2 and 3.2.
 
 ---
 
@@ -65,17 +66,42 @@ the structure only exists in `_elementor_data`, which the helper plugin already 
 **Status: awaiting sign-off** on the two-lane approach (prose → Blocks, builder pages →
 dynamic zone) before implementation.
 
-### 1.3 ACF Group → component — **done**; repeating lists still open
+### 1.3 ACF Group → component, and repeating lists → repeatable components — **done**
 
 An ACF Group used to land as flattened sibling fields (`resultsHeadline`, `resultsMetric`,
 `resultsSummary`). The analyzer now detects that shape — a parent key holding nothing beside
 `<parent>_<sub>` siblings — defines the component in the config, and the migration assembles
 the nested object. Verified on the demo site: `results: { headline, metric, summary }`.
 
-Still open: **lists of objects** (Meta Box's `team_member_experience_list`, ACF Pro
-repeaters) should become *repeatable* components. The analyzer flags them with that advice
-but still stores them as `json`. Relations and rich text inside a component are coerced to
-strings, deliberately — those are modelling decisions for a human.
+Repeating fields are now repeatable components too, rather than a `json` blob nobody can edit
+in the admin. Both demo sites end with **no `json` fields left at all**.
+
+The plan assumed these were "lists of objects". They aren't: Meta Box stores a repeater as
+**positional arrays with no field names anywhere** — `[["2012 - 2017", "Microsoft Inc.",
+"Triggerfish bluntnose…"], …]` — so a component has to invent them. Names are invented only
+where a column's shape is unmistakable (a URL, an icon class, a year range, a paragraph of
+prose); everything else keeps its position, `field2`, which a reviewer can trace to the second
+column and rename. Guessing "company" and being wrong would put a falsehood in the schema, and
+schemas get believed.
+
+*Evidence:* Northfield `team.specialties` → `lists.team-specialties` with one `value` field,
+migrating as `[{value: "ui"}, {value: "ux"}]`. Neuros `team_member_experience_list` →
+`lists.team-member-experience-list` with `period, field2, description`, migrating as two rows
+of real values. Lists of ids stay relations — all 14 Northfield and 6 Neuros relations survive
+untouched, and `listShape` refuses id lists a second time so a change of ordering could never
+turn a relation into a component.
+
+**A bug found by fixture, not by reasoning.** WordPress meta is multi-row, so the analyzer
+unwraps a one-item array to its value — and a repeater with a single row is a one-item array.
+`[["250+", "Awesome team members"]]` was unwrapped into a flat list and migrated as one field
+holding `"250+,Awesome team members"`. Neither demo site showed it, because the only real
+single-row repeater is filtered earlier as a theme default; a synthetic fixture caught it. A
+one-item array whose item is itself an array is now left alone.
+
+Still deliberately out: relations and rich text inside a component are coerced to strings —
+those are modelling decisions for a human. And a single-row repeater of *named objects* is
+still read as one object, because an ACF image arrives as `[{…}]` and must unwrap to be
+recognised; telling those two apart is guesswork.
 
 ### 1.4 Follow LaunchPad's reusable-section pattern
 

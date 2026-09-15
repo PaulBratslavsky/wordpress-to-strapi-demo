@@ -3,6 +3,7 @@ import { loadJson, parseArgs, kebab, camel, pluralize, slugify, htmlToText, rout
 import { detectPageBuilder } from './lib/html.js';
 import { MediaLibrary } from './lib/media.js';
 import { planMarkdown } from './lib/plan.js';
+import { listShape, wrapsRow } from './lib/repeatable.js';
 
 /**
  * ANALYZE — read the export, print a migration plan, and write a starter
@@ -57,7 +58,9 @@ function infer(key, values, ctx) {
   // Judge those by their content instead of calling them JSON.
   const allArrays = vals.every((v) => Array.isArray(v));
   const identical = (v) => new Set(v.map((x) => JSON.stringify(x))).size === 1;
-  if (allArrays && vals.every((v) => v.length === 1 || identical(v))) vals = vals.map((v) => v[0]);
+  // …unless the one item is itself a row: that is a repeater with a single row,
+  // and unwrapping it would pass its cells off as a flat list of strings.
+  if (allArrays && vals.every((v) => (v.length === 1 || identical(v)) && !wrapsRow(v))) vals = vals.map((v) => v[0]);
 
   const str = vals.every((v) => typeof v === 'string');
   const mediaish = MEDIA_KEY.test(key);
@@ -101,11 +104,18 @@ function infer(key, values, ctx) {
     if (vals.some((v) => /<\/?[a-z][^>]*>/i.test(v))) return { type: ctx.richType, transform: 'content', note: 'contains HTML → converted like the body' };
     return { type: vals.some((v) => v.length > 255 || v.includes('\n')) ? 'text' : 'string', transform: 'raw' };
   }
-  if (vals.every((v) => Array.isArray(v) && v.every((x) => typeof x === 'string'))) {
-    return { type: 'json', transform: 'raw', note: 'list of strings — consider a repeatable component, or a collection + relation for tags' };
-  }
-  if (vals.every((v) => Array.isArray(v) && v.every((x) => x && typeof x === 'object'))) {
-    return { type: 'json', transform: 'raw', note: 'list of objects (repeater/group) — consider a repeatable component' };
+  // A repeating field Strapi can hold as a repeatable component. Lists of ids were
+  // already claimed as relations above, and listShape refuses them again.
+  const shape = listShape(vals);
+  if (shape) {
+    const note =
+      shape.kind === 'scalar'
+        ? 'list of strings → repeatable component with one "value" field (a collection + relation may suit tags better)'
+        : shape.kind === 'object'
+          ? 'repeater → repeatable component, using its own key names'
+          : `repeater stored as positional rows → repeatable component (${shape.columns.map((c) => c.name).join(', ')}); ` +
+            'columns are named only where the shape is unmistakable — rename any fieldN';
+    return { type: 'list', shape, note };
   }
   return { type: 'json', transform: 'raw', note: 'mixed or nested values' };
 }
@@ -302,8 +312,28 @@ function main() {
         let name = camel(key.startsWith(typePrefix) ? key.slice(typePrefix.length) : key);
         if (RESERVED_ATTRS.has(name) || seen.has(name) || /^(strapi|__)/.test(name)) name = `custom${pascal(name)}`;
         seen.add(name);
-        const { targetWp, ...field } = guess;
+        const { targetWp, shape, ...field } = guess;
         if (targetWp) field.target = names[`postType:${targetWp}`];
+
+        // A repeating field becomes its own component, the way a flattened group does.
+        if (field.type === 'list' && shape) {
+          const uid = `lists.${t.singularName}-${kebab(name)}`;
+          config.components[uid] = {
+            displayName: titleCase(name),
+            attributes: Object.fromEntries(shape.columns.map((c) => [c.name, { type: c.type }])),
+          };
+          t.fields[name] = {
+            type: 'component',
+            component: uid,
+            repeatable: true,
+            from: `${src}.${key}`,
+            transform: 'list',
+            list: { kind: shape.kind, columns: shape.columns.map((c) => ({ name: c.name, ...(c.key ? { key: c.key } : {}) })) },
+          };
+          flag(`${typeLabel}.${name} ← ${src}.${key}: ${field.note}`);
+          continue;
+        }
+
         t.fields[name] = { ...field, from: `${src}.${key}` };
         if (field.note) flag(`${typeLabel}.${name} ← ${src}.${key}: ${field.note}`);
       }

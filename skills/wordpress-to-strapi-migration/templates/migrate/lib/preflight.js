@@ -27,6 +27,7 @@ const TRANSFORMS = new Set([
   'content',
   'sections',
   'group',
+  'list',
   'site',
   'slug',
   'date-gmt',
