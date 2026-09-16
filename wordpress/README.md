@@ -21,7 +21,7 @@ You need [Local](https://localwp.com) (free, macOS / Windows / Linux).
 2. In Local, click **+**, drag the zip onto the *import a site* box, name the site `northfield`, choose **Preferred**, and click **Import site**.
 3. Click **WP Admin** and log in as `admin` / `password`.
 
-The theme, plugins and content are already in the zip. To rebuild it from a running site, run `./wordpress/build-local-site.sh`.
+The theme, plugins, content and the migration helper are already in the zip. To rebuild it from a running site, run `./wordpress/build-local-site.sh`, then check it with `./wordpress/test-local-site.sh` before publishing.
 
 ### Building it from the plugin instead
 
@@ -56,7 +56,7 @@ wp northfield seed
 
 ## Prepare the site for migration
 
-The migration reads WordPress through its REST API. Before you run it:
+The migration reads WordPress through its REST API. The Local site zip already includes the helper plugin, so if you imported it you only need step 2. Before you run it:
 
 1. **Add the helper plugin.**
    - In Local, right-click the site → **Go to site folder**.

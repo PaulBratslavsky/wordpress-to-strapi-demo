@@ -5,14 +5,14 @@
 # Local's import has no scripting API, so this reproduces it: the WordPress core
 # Local installs, the zip's wp-content, the zip's database loaded into a scratch
 # database, and Local's own PHP serving it. It needs one running Local site to
-# borrow a MySQL server from (northfield.local by default).
+# borrow a MySQL server from (southfield.local by default).
 #
 # Usage: ./wordpress/test-local-site.sh [zip] [domain-of-a-running-local-site]
 set -euo pipefail
 
 cd "$(dirname "$0")"
 ZIP="$(cd "$(dirname "${1:-dist/northfield-local-site.zip}")" && pwd)/$(basename "${1:-dist/northfield-local-site.zip}")"
-DOMAIN="${2:-northfield.local}"
+DOMAIN="${2:-southfield.local}"
 PORT=8899
 URL="http://127.0.0.1:$PORT"
 DB="northfield_bootcheck"
@@ -112,6 +112,18 @@ check "dashboard"               "$URL/wp-admin/"                     "Dashboard"
 check "plugins, all active"     "$URL/wp-admin/plugins.php"          "Elementor"
 check "Elementor editor"        "$URL/wp-admin/post.php?post=$(mysql -N "$DB" -e "SELECT post_id FROM wp_postmeta WHERE meta_key='_elementor_edit_mode' LIMIT 1")&action=elementor" "elementor"
 check "ACF field groups"        "$URL/wp-admin/edit.php?post_type=acf-field-group" "Project details"
+check "helper under Must-Use"   "$URL/wp-admin/plugins.php?plugin_status=mustuse" "Strapi Migration Helper"
+check "helper exposes Team"     "$URL/?rest_route=/wp/v2/team"      '"type":"team"'
+
+# the post has readers create an application password and call the helper with it
+WPCLI="/Applications/Local.app/Contents/Resources/extraResources/bin/wp-cli/wp-cli.phar"
+APP_PASS="$("$PHP" -c "$PHP_INI" "$WPCLI" --path="$SITE" user application-password create admin boot-check --porcelain 2>/dev/null || true)"
+info="$(curl -s -u "admin:$APP_PASS" "$URL/?rest_route=/strapi-migration/v1/info")"
+if [ -n "$APP_PASS" ] && grep -qF '"forced_post_types":["team"]' <<<"$info"; then
+  echo "ok    application password reads the helper's info"
+else
+  echo "FAIL  application password reads the helper's info: ${info:0:120}"; FAIL=1
+fi
 
 inactive="$(curl -s -b "$JAR" "$URL/wp-admin/plugins.php" | grep -oE 'class="inactive[^"]*" data-slug="[^"]+"' | sed 's/.*data-slug="//;s/"//' | tr '\n' ' ' || true)"
 if [ -n "$inactive" ]; then echo "FAIL  inactive plugins: $inactive"; FAIL=1; fi

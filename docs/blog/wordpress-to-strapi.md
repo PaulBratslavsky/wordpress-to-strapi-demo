@@ -308,10 +308,11 @@ that is not working. That is also why the application password is on the prerequ
 rather than being optional: without it the export asks for `context=view` and gets the public
 answer.
 
-It also reports what it did. Ask it directly:
+It also reports what it did. Ask it directly, using the application password, because the
+endpoint only answers logged-in users:
 
 ```
-GET /wp-json/strapi-migration/v1/info
+curl -u admin:"xxxx xxxx xxxx xxxx xxxx xxxx" http://northfield.local/wp-json/strapi-migration/v1/info
 
 {"version":"1.0.0","forced_post_types":["team"],"forced_taxonomies":["department"]}
 ```
@@ -541,46 +542,38 @@ shortcodes. A draft with no slug. A scheduled post. Links to a domain that no lo
 These are demo credentials for a site that only runs on your machine. Change them under
 **Users, Profile** if you like.
 
-**Step 5. Download this repo.** The migration skill and the helper plugin live here. Open your
-normal terminal and run:
+**Step 5. Check the migration helper is there.** In WP Admin, go to **Plugins** and click the
+**Must-Use** tab. You should see **Strapi Migration Helper**.
+
+This small plugin comes with the demo site. It makes the post types and custom fields that
+WordPress hides from its API readable, which is the trap described earlier. WordPress loads
+anything in `wp-content/mu-plugins/` automatically, so there is nothing to activate. On your own
+site you add it yourself: copy
+`skills/wordpress-to-strapi-migration/templates/wordpress/strapi-migration-helper.php` from this
+repo into that folder, and delete it when the migration is done.
+
+**Step 6. Create an application password.** This is the password the migration uses to read the
+site, including drafts and custom fields.
+
+1. In WP Admin, go to **Users, Profile**.
+2. Scroll down to **Application Passwords**.
+3. Type `strapi-migration` as the name and click **Add New Application Password**.
+4. Copy the password it shows. WordPress will not show it again.
+
+You will give it to Claude in section 3.
+
+**Step 7. Download this repo.** The migration skill lives here. Open a terminal and run:
 
 ```bash
-cd ~
 git clone https://github.com/PaulBratslavsky/wordpress-to-strapi-demo.git
 ```
-
-**Step 6. Open the site shell.** In Local, right-click `northfield` in the site list and choose
-**Open site shell**. A terminal opens with WP-CLI, WordPress's command-line tool, already
-connected to this site. Run the next two steps in that window.
-
-**Step 7. Add the migration helper.** This small plugin makes the hidden content readable.
-WordPress loads anything in `mu-plugins` automatically, so there is nothing to activate:
-
-```bash
-MU="$(wp eval 'echo WP_CONTENT_DIR;')/mu-plugins"
-mkdir -p "$MU"
-cp ~/wordpress-to-strapi-demo/skills/wordpress-to-strapi-migration/templates/wordpress/strapi-migration-helper.php "$MU/"
-curl -s http://northfield.local/wp-json/strapi-migration/v1/info
-```
-
-You should see: `{"version":"1.0.0","forced_post_types":["team"],...}`. Delete the file when
-your migration is finished.
-
-**Step 8. Create an application password.** This is the password the migration uses to read
-the site, including drafts and custom fields:
-
-```bash
-wp user application-password create admin strapi-migration --porcelain
-```
-
-You should see: one line of letters and numbers. Copy it now, because WordPress will not show it
-again. You will give it to Claude in section 3.
 
 > **Not using Local?** The same site can be built on any WordPress 6.5+ install from the plugin in
 > this repo. Run `./wordpress/build-plugin-zip.sh`, then on the site run
 > `wp theme install inspiro --activate`,
 > `wp plugin install elementor wpzoom-portfolio custom-post-type-ui advanced-custom-fields --activate`,
 > `wp plugin install wordpress/dist/northfield-demo.zip --activate` and `wp northfield seed`.
+> Then copy the helper plugin into `wp-content/mu-plugins/` as described in step 5.
 > The [WordPress setup guide](https://github.com/PaulBratslavsky/wordpress-to-strapi-demo/tree/main/wordpress)
 > has the click-through version.
 
@@ -603,16 +596,16 @@ new API Token and choose Full access. Keep that token.
 The skill lives at `.claude/skills/wordpress-to-strapi-migration/`, so Claude Code finds it when
 you open this repo. To use it on another project, copy that folder into `~/.claude/skills/`.
 
-Then describe your situation:
+Then describe your situation, pasting the application password from step 6:
 
 ```
 Migrate my WordPress site at http://northfield.local into the Strapi project
 at ./my-strapi, running on http://localhost:1337. My WordPress user is admin and
-the application password is in migrate/.env. Start with a dry run.
+the application password is xxxx xxxx xxxx xxxx xxxx xxxx. Start with a dry run.
 ```
 
-Claude copies the engine, installs it, fills in the environment file, and runs the export and
-the analyze step. Then it stops.
+Claude copies the engine, installs it, writes the password into the engine's `.env` file, and
+runs the export and the analyze step. Then it stops.
 
 ### 4. Read the plan before anything is written
 
