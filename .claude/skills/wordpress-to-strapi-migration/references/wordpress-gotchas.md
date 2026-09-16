@@ -12,7 +12,9 @@ On one commercial theme we tested, four of five custom post types and *every* cu
 were invisible. A REST-based migration would have completed "successfully" with half the site
 missing and no error anywhere.
 
-**Fix:** install `templates/wordpress/strapi-migration-helper.php` into `wp-content/mu-plugins/`.
+**Fix:** install the Strapi Migration Helper plugin
+([zip](https://github.com/PaulBratslavsky/wordpress-to-strapi-demo/releases/latest/download/strapi-migration-helper.zip), or `templates/wordpress/strapi-migration-helper.php` zipped inside a
+`strapi-migration-helper/` folder) through Plugins → Add Plugin → Upload Plugin, and activate it.
 It turns on `show_in_rest` for public types and taxonomies, returns all custom fields as
 `migration_meta` to authenticated editors, and exposes `/wp-json/strapi-migration/v1/info`
 so the export can report what it had to reveal. Delete it afterwards.

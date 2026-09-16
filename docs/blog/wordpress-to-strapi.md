@@ -295,11 +295,15 @@ The three `results_*` keys are now one `Results` component with `headline`, `met
 list against the post types in your WP Admin menu. Anything in the menu but not in the JSON is
 hidden.
 
-**What to do:** the skill ships a temporary plugin,
-`templates/wordpress/strapi-migration-helper.php`. Copy it into `wp-content/mu-plugins/`.
-A must-use plugin is a PHP file WordPress loads automatically, with nothing to activate. This
-one switches `show_in_rest` on for public types that opted out, and adds every custom field to
-an entry as `migration_meta`. Delete it when the migration is done.
+**What to do:** install the Strapi Migration Helper, a small temporary plugin that comes with
+the skill. It switches `show_in_rest` on for public types that opted out, and adds every custom
+field to an entry as `migration_meta`. It installs like any other plugin:
+
+1. Download [strapi-migration-helper.zip](https://github.com/PaulBratslavsky/wordpress-to-strapi-demo/releases/latest/download/strapi-migration-helper.zip).
+2. In WP Admin, go to **Plugins**, click **Add Plugin**, then **Upload Plugin** at the top.
+3. Choose the zip, click **Install Now**, then **Activate Plugin**.
+
+When the migration is done, deactivate it and delete it from the **Plugins** page.
 
 Two things about that field catch people out, including me while writing this. It only appears
 on an authenticated request, and only when you ask for `context=edit`. An anonymous read of the
@@ -546,15 +550,18 @@ shortcodes. A draft with no slug. A scheduled post. Links to a domain that no lo
 These are demo credentials for a site that only runs on your machine. Change them under
 **Users, Profile** if you like.
 
-**Step 5. Check the migration helper is there.** In WP Admin, go to **Plugins** and click the
-**Must-Use** tab. You should see **Strapi Migration Helper**.
+**Step 5. Check the migration helper is active.** In WP Admin, click **Plugins** in the left
+menu. Scroll past the banners at the top to the plugin list. You should see
+**Strapi Migration Helper** there with a **Deactivate** link under it, which means it is active.
 
-This small plugin comes with the demo site. It makes the post types and custom fields that
-WordPress hides from its API readable, which we described earlier. WordPress loads
-anything in `wp-content/mu-plugins/` automatically, so there is nothing to activate. On your own
-site you add it yourself: copy
-`skills/wordpress-to-strapi-migration/templates/wordpress/strapi-migration-helper.php` from this
-repo into that folder, and delete it when the migration is done.
+This is the plugin that makes the hidden post types and custom fields readable, as described
+earlier. The demo site comes with it installed. On your own site you install it yourself, the
+normal way:
+
+1. Download [strapi-migration-helper.zip](https://github.com/PaulBratslavsky/wordpress-to-strapi-demo/releases/latest/download/strapi-migration-helper.zip).
+2. Go to **Plugins**, click **Add Plugin**, then **Upload Plugin** at the top. Choose the zip,
+   click **Install Now**, then **Activate Plugin**.
+3. When the migration is done, deactivate it and delete it.
 
 **Step 6. Create an application password.** This is the password the migration uses to read the
 site, including drafts and custom fields.
@@ -584,7 +591,7 @@ anyway.
 > `wp theme install inspiro --activate`,
 > `wp plugin install elementor wpzoom-portfolio custom-post-type-ui advanced-custom-fields --activate`,
 > `wp plugin install wordpress/dist/northfield-demo.zip --activate` and `wp northfield seed`.
-> Then copy the helper plugin into `wp-content/mu-plugins/` as described in step 5.
+> Then install the helper plugin as described in step 5.
 > The [WordPress setup guide](https://github.com/PaulBratslavsky/wordpress-to-strapi-demo/tree/main/wordpress)
 > has the click-through version.
 
@@ -792,7 +799,7 @@ the demo site, the skill, the engine, and the full notes from both runs.
 - WordPress REST API Handbook: https://developer.wordpress.org/rest-api/
 - register_post_type and show_in_rest: https://developer.wordpress.org/reference/functions/register_post_type/
 - register_post_meta: https://developer.wordpress.org/reference/functions/register_post_meta/
-- Must-use plugins: https://developer.wordpress.org/advanced-administration/plugins/mu-plugins/
+- Installing a plugin from a zip in WP Admin: https://wordpress.org/documentation/article/manage-plugins/
 - WPGraphQL, if you would rather stay on WordPress and go headless: https://www.wpgraphql.com/
 - Advanced Custom Fields: https://www.advancedcustomfields.com/
 - Meta Box: https://metabox.io/

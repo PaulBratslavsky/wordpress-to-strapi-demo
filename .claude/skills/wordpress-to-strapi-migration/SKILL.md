@@ -46,7 +46,7 @@ templates/
 │   ├── lib/                     # wordpress, strapi, html, blocks, sections, components, media, links
 │   └── test/                    # node --test test/*.test.js
 ├── wordpress/
-│   └── strapi-migration-helper.php   # temporary mu-plugin: exposes hidden types and fields
+│   └── strapi-migration-helper.php   # temporary plugin: exposes hidden types and fields
 └── strapi/
     ├── src/index.ts             # optional: grant public read to migrated types
     └── scripts/create-api-token.mjs  # mint a full-access token headlessly
@@ -62,10 +62,15 @@ references/
 2. **An application password.** WP Admin → Users → Profile → Application Passwords. Without
    it you only get published content and no custom fields. WordPress accepts application
    passwords over plain HTTP only on sites marked as a local environment.
-3. **The helper plugin** — copy `templates/wordpress/strapi-migration-helper.php` into
-   `wp-content/mu-plugins/`. Commercial themes routinely register post types and custom
-   fields without REST access; without this you will migrate a site-shaped hole and never see
-   an error. Delete it when the migration is done.
+3. **The helper plugin.** Commercial themes routinely register post types and custom fields
+   without REST access; without this you will migrate a site-shaped hole and never see an
+   error. The user installs it like any plugin: WP Admin → Plugins → Add Plugin → Upload
+   Plugin → choose the zip → Install Now → Activate Plugin. Deactivate and delete it when
+   the migration is done.
+   - Download: https://github.com/PaulBratslavsky/wordpress-to-strapi-demo/releases/latest/download/strapi-migration-helper.zip
+   - Or build it from `templates/wordpress/strapi-migration-helper.php`: put the file in a
+     folder named `strapi-migration-helper` and zip that folder.
+   - With WP-CLI on the site: `wp plugin install strapi-migration-helper.zip --activate`.
 4. **A Strapi v5 project.** If there isn't one:
    `npx create-strapi-app@latest my-strapi --no-run --skip-cloud --typescript --dbclient sqlite --dbfile .tmp/data.db`
    Pass `--dbfile`: with an empty `DATABASE_FILENAME` Strapi tries to open the project

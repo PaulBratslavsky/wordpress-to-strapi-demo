@@ -13,9 +13,9 @@
 # What the zip contains:
 #   northfield.sql   the cleaned database
 #   wp-content/      theme, plugins (Elementor, ACF, CPT UI, WPZOOM Portfolio,
-#                    northfield-demo), the 30 demo images, and the migration
-#                    helper in mu-plugins/ (copied from the skill, so it is
-#                    always the current version)
+#                    northfield-demo, and the Strapi Migration Helper as an
+#                    ordinary active plugin, copied from the skill so it is
+#                    always the current version) and the 30 demo images
 #
 # What it leaves out on purpose:
 #   - the site owner's email, password, sessions and application passwords
@@ -48,6 +48,7 @@ EOF
 SOCK="$LOCAL/run/$SITE_ID/mysql/mysqld.sock"
 [ -S "$SOCK" ] || { echo "Site $DOMAIN is not running. Start it in Local first." >&2; exit 1; }
 BIN="$(ls -d "$LOCAL/lightning-services/"mysql-*/bin/darwin-arm64/bin | head -1)"
+PHP="$(ls -d "$LOCAL/lightning-services/"php-8*/bin/darwin-arm64/bin/php | head -1)"
 mysql()     { "$BIN/mysql"     -uroot -proot --socket="$SOCK" "$@" 2>/dev/null; }
 mysqldump() { "$BIN/mysqldump" -uroot -proot --socket="$SOCK" --skip-dump-date "$@" 2>/dev/null; }
 
@@ -96,6 +97,21 @@ DELETE FROM wp_posts WHERE post_type IN ('revision', 'customize_changeset', 'oem
 DELETE pm FROM wp_postmeta pm LEFT JOIN wp_posts p ON p.ID = pm.post_id WHERE p.ID IS NULL;
 SQL
 
+# ship the helper as an ordinary active plugin, the way readers install it on
+# their own site. active_plugins is serialized PHP, so PHP edits it.
+SOCK="$SOCK" DB="$SCRATCH_DB" "$PHP" -r '
+  $db = new mysqli("localhost", "root", "root", getenv("DB"), 0, getenv("SOCK"));
+  $row = $db->query("SELECT option_value FROM wp_options WHERE option_name = \"active_plugins\"")->fetch_row();
+  $plugins = unserialize($row[0]);
+  $plugins[] = "strapi-migration-helper/strapi-migration-helper.php";
+  $plugins = array_values(array_unique($plugins));
+  sort($plugins);
+  $stmt = $db->prepare("UPDATE wp_options SET option_value = ? WHERE option_name = \"active_plugins\"");
+  $value = serialize($plugins);
+  $stmt->bind_param("s", $value);
+  $stmt->execute();
+'
+
 mysqldump "$SCRATCH_DB" > "$WORK/northfield.sql"
 
 # the zip always ships as northfield.local, whatever the source site is called now.
@@ -133,19 +149,26 @@ EXCLUDES=(
   /wp-content/cache/
   /wp-content/debug.log
   /wp-content/uploads/elementor/css/
+  /wp-content/mu-plugins/strapi-migration-helper.php
+  /wp-content/plugins/strapi-migration-helper/
 )
 RSYNC_ARGS=(-a --exclude '.DS_Store')
 for e in "${EXCLUDES[@]}"; do RSYNC_ARGS+=(--exclude "$e"); done
 rsync "${RSYNC_ARGS[@]}" "$SITE_PATH/app/public/wp-content" "$WORK/"
 
-# the helper that makes hidden types and fields readable, from the skill itself
-mkdir -p "$WORK/wp-content/mu-plugins"
+# the helper that makes hidden types and fields readable, from the skill itself.
+# A copy in mu-plugins as well would load it twice and fatal on the constant.
+mkdir -p "$WORK/wp-content/plugins/strapi-migration-helper"
 cp ../skills/wordpress-to-strapi-migration/templates/wordpress/strapi-migration-helper.php \
-   "$WORK/wp-content/mu-plugins/"
+   "$WORK/wp-content/plugins/strapi-migration-helper/"
+if [ -e "$WORK/wp-content/mu-plugins/strapi-migration-helper.php" ]; then
+  echo "Refusing to build: the helper is in mu-plugins as well as plugins." >&2
+  exit 1
+fi
 
 # the copy must match the site file for file, apart from the exclusions above
 list() { (cd "$1" && find wp-content -type f ! -name .DS_Store | sort); }
-missing="$(comm -23 <(list "$SITE_PATH/app/public" | grep -vE '^wp-content/(upgrade/|fonts/|cache/|debug\.log$|uploads/elementor/css/)') <(list "$WORK"))"
+missing="$(comm -23 <(list "$SITE_PATH/app/public" | grep -vE '^wp-content/(upgrade/|fonts/|cache/|debug\.log$|uploads/elementor/css/|mu-plugins/strapi-migration-helper\.php$|plugins/strapi-migration-helper/)') <(list "$WORK"))"
 if [ -n "$missing" ]; then
   echo "Refusing to build: these files did not make it into the copy:" >&2
   echo "$missing" | head -20 >&2
