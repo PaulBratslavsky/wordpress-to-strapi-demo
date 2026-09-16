@@ -12,7 +12,7 @@
 - One failure mode is silent, so check for it first. WordPress hides post types and custom fields
   from its own REST API unless somebody switched them on, which means a migration can finish with
   no errors and still be missing half your content.
-- Practise on a throwaway site first. This repo builds one for you in about a minute, with the
+- Practice on a throwaway site first. This repo builds one for you in about a minute, with the
   hard parts already in it.
 - We ran the skill against two real sites, one built for this repo and one commercial theme's
   demo content. Everything below is what those runs produced.
@@ -67,12 +67,12 @@ the weight:
   order, and an editor rearranges them by dragging, not by editing markup.
 - **A field type Strapi lacks is one you can add.** Text, number, date, boolean, media and
   relations ship with it. Anything else is a custom field: a small plugin that registers a new
-  type so it appears in the Content-Type Builder beside the built-in ones. A colour picker, a
+  type so it appears in the Content-Type Builder beside the built-in ones. A color picker, a
   map location, a star rating.
 
 So a migration is not a copy. Every field has to land in one of three piles: content that moves,
 presentation that stays behind, and the pile that looks like one but is really the other. That
-third pile is where the judgement goes, and most of this post is about it.
+third pile is where the judgment goes, and most of this post is about it.
 
 Four questions decide how yours will go. Answer them before you start.
 
@@ -81,7 +81,7 @@ these post types. Posts and Pages come as standard. A plugin or theme can regist
 Services, Team, Projects, Vacancies. Each one becomes a collection type in Strapi.
 
 **Which fields are which?** This is the third pile from a moment ago, and it is worth knowing
-how hard it can get. `client_name` is obviously content and `header_background_colour` is
+how hard it can get. `client_name` is obviously content and `header_background_color` is
 obviously not. The awkward ones sit between: a `subtitle` that half your entries use as a real
 subheading and the other half leave blank because the theme hides it, or a `featured` checkbox
 that drives a carousel. Both arrive through the same channel and look identical in the database.
@@ -132,11 +132,11 @@ day. A field called `field2`, or a page that arrives as one undifferentiated blo
 is a decision you made on their behalf.
 
 **Work from a copy.** Never rehearse on the live site. Local makes one in a couple of minutes,
-and this post's demo site exists so you can practise on something disposable first.
+and this post's demo site exists so you can practice on something disposable first.
 
 ## Improving the model while you move it
 
-A migration is a great moment you will ever get to fix your content model. Today, turning
+A migration is the best moment you will ever get to fix your content model. Today, turning
 three loose fields into one component is a line in a config file. Once five thousand entries are
 in Strapi and a front end is reading them, the same change is a data migration and a release.
 
@@ -148,7 +148,7 @@ required to reproduce it.
 |---|---|
 | `specialties: ["branding", "ui", "strategy"]` as text on every team member | a `Skill` collection with relations, so you can ask who does branding |
 | a Work page listing your six projects as copy | a relation to the six `portfolio_item` entries, so the page follows them |
-| `header_background_colour`, `page_title_padding` | nothing. That belongs in the front end |
+| `header_background_color`, `page_title_padding` | nothing. That belongs in the front end |
 | a body that is one block of rich text on a page that is really five sections | a dynamic zone, so an editor can move a section without editing HTML |
 
 Some of this the skill does without being asked. It collapses a flattened ACF group into one
@@ -162,14 +162,14 @@ changing `migration.config.json` before anything is generated.
 
 And some of it the skill will not do for you today. It flags a page that repeats a collection,
 but it will not rewrite that page into a relation, because deciding a paragraph *is* a given
-entry is a judgement call and a confident wrong guess replaces real content with a link to the
+entry is a judgment call and a confident wrong guess replaces real content with a link to the
 wrong thing. It has no way to promote `specialties` into a `Skill` collection either: that means
 inventing a collection WordPress never had and filling it from the distinct values of a field.
 Both are worth doing by hand afterwards, in the Strapi admin or with a short script, once the
 content is in and you can see it.
 
 **Where to stop.** Every change is also a change your front end has to handle, and a migration
-that redesigns the model at the same time is two risky projects sharing one deadline. Normalise
+that redesigns the model at the same time is two risky projects sharing one deadline. Normalize
 the structure, not the words: changing how a field is shaped is a contained job, rewriting
 everybody's copy is a different one with different reviewers. If you cannot say what a change
 buys you, keep the shape you have and move on.
@@ -225,7 +225,7 @@ the REST toggle where it was, and the effect is identical.
 
 Here is what those hidden fields look like when they are working:
 
-![A Riverbend Coffee Roasters project page showing sections titled The challenge, Our approach, a three-image gallery, and Results listing wholesale orders up 40 per cent.](images/wp-project.png)
+![A Riverbend Coffee Roasters project page showing sections titled The challenge, Our approach, a three-image gallery, and Results listing wholesale orders up 40 percent.](images/wp-project.png)
 
 The challenge, the approach, the gallery and the results on that page are all ACF fields, and
 every one of them is content somebody wrote and would expect to keep.
@@ -335,7 +335,7 @@ components, so an editor can build a page out of varied sections.
 
 The skill reads Elementor's JSON and maps each widget to a component. A `heading` and a
 `text-editor` merge into one rich-text section. An `image` becomes an image section. A
-`testimonial` becomes a quote. Anything it does not recognise degrades to rich text rather than
+`testimonial` becomes a quote. Anything it does not recognize degrades to rich text rather than
 disappearing, and gets counted by name in the report so you can see what it did not know.
 
 **How to check:** look for `_elementor_data` in your post meta, or just open a page in WP Admin
@@ -401,6 +401,26 @@ presentation keys per entry: `header_*`, `footer_*`, `page_title_*`, border radi
 drops keys that look like layout settings, keys starting with `_`, and keys whose value is
 identical on every entry, then lists everything it dropped so you can pull one back if it was
 content after all. On the Neuros project type that was 67 dropped against 17 kept.
+
+#### What replaces ACF on the Strapi side
+
+ACF does two separate jobs on a WordPress site. It adds field types the editor did not have, and
+it puts extra panels in the admin. Strapi splits those across two extension points, and it is
+worth knowing which is which before you decide a field cannot come across.
+
+Custom fields cover the first job, and the habits list earlier says what you get from one.
+Building one means registering it twice. `strapi.customFields.register()` on the server declares
+what the value is and how it validates. `app.customFields.register()` in the admin declares what
+the editor sees. A field
+registered on the server but not in the admin never shows up in the Content-Type Builder, which is
+the usual reason a half-built one appears to do nothing.
+
+Widgets cover the second job. `app.widgets.register()` adds a panel of your own to the admin
+homepage: entries waiting on review, counts that mean something to this site, a link into whatever
+tool the team actually uses.
+
+Neither is a migration step, and neither is worth building before the content is in. They matter
+because "ACF did this and Strapi does not" is usually answered by one of the two.
 
 ### Files Strapi will not accept
 
@@ -592,7 +612,7 @@ separately.
   flatten to one paragraph per row, galleries become consecutive images, horizontal rules are
   dropped. Use the Markdown format to keep tables, or a dynamic zone to keep the structure.
 
-Here is one of those tables on the demo site, in a post about colour contrast:
+Here is one of those tables on the demo site, in a post about color contrast:
 
 ![A blog post on Northfield Studio titled Five Accessibility Fixes You Can Ship This Week, showing a three-column table of text types, minimum contrast ratios and passing examples.](images/wp-post-table.png)
 
@@ -630,7 +650,7 @@ JSON-escaped form (`https:\/\/...`) that page builders store.
 > Every site has unknowns. Fields nobody registered for the API. A page builder storing layout
 > somewhere the API never shows. A plugin someone installed in 2019 and forgot. The skill cannot
 > know about those in advance. What it can do is report honestly: name every entry it was unsure
-> about, count every widget it did not recognise, and tell you which URLs still point at the old
+> about, count every widget it did not recognize, and tell you which URLs still point at the old
 > server.
 >
 > So treat it as a loop. Run the pipeline. Read what it flagged. Adjust the config. Run it again.
@@ -652,7 +672,7 @@ filtered, because terms and users carry no modification date, so they always run
 **Watch the files, not the entries.** Entries are fast. Files are not. The upload cache survives
 restarts, so an interrupted run resumes rather than re-uploading.
 
-**Change the skill.** It is a folder of Markdown and scripts. The component catalogue in
+**Change the skill.** It is a folder of Markdown and scripts. The component catalog in
 `lib/components.js` is a table entry plus a mapping rule, so adding an accordion or a pricing
 table is a few lines. The Elementor widget map in `lib/sections.js` is where your theme's widgets
 go, and the run reports every widget it skipped with counts, which is the to-do list for that
@@ -671,6 +691,8 @@ the demo site, the skill, the engine, and the full notes from both runs.
 - The demo site, the skill and both migration runs: https://github.com/PaulBratslavsky/wordpress-to-strapi-demo
 - Strapi 5 documentation: https://docs.strapi.io
 - Strapi LaunchPad, the reference project for the relation pattern: https://github.com/strapi/LaunchPad
+- Strapi custom fields, for field types Strapi does not ship with: https://docs.strapi.io/cms/features/custom-fields
+- Strapi admin homepage customization, for dashboard widgets: https://docs.strapi.io/cms/admin-panel-customization/homepage
 - Strapi's MCP server, for querying your migrated content from an AI client: https://docs.strapi.io/cms/features/strapi-mcp-server
 - Using Claude Code with Strapi over MCP: https://strapi.io/blog/claude-code-strapi-mcp-ai-content-workflows
 - WordPress REST API Handbook: https://developer.wordpress.org/rest-api/
