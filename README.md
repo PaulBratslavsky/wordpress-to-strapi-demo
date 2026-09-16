@@ -53,7 +53,13 @@ The skill in [`skills/wordpress-to-strapi-migration/`](skills/wordpress-to-strap
 
 ### Using the skill
 
-A copy lives at `.claude/skills/wordpress-to-strapi-migration/`, so **Claude Code finds it automatically when you open this repo** — nothing to install. To use it on a different project, copy that folder into `~/.claude/skills/` and it is available everywhere.
+Install it for every project with one command. It copies only the skill into `~/.claude/skills/`, not this repo:
+
+```bash
+npx skills add PaulBratslavsky/wordpress-to-strapi-demo -g --agent claude-code --yes
+```
+
+If you have cloned this repo, there is nothing to install: a copy lives at `.claude/skills/wordpress-to-strapi-migration/`, so Claude Code finds it when you open the repo.
 
 The scripts are plain Node, so you can run them directly if you prefer. With the skill installed, you describe your site instead and Claude runs them. Open the project in Claude Code and ask, naming your site and your Strapi:
 

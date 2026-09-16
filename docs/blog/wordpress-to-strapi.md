@@ -550,7 +550,7 @@ These are demo credentials for a site that only runs on your machine. Change the
 **Must-Use** tab. You should see **Strapi Migration Helper**.
 
 This small plugin comes with the demo site. It makes the post types and custom fields that
-WordPress hides from its API readable, which is the trap described earlier. WordPress loads
+WordPress hides from its API readable, which we described earlier. WordPress loads
 anything in `wp-content/mu-plugins/` automatically, so there is nothing to activate. On your own
 site you add it yourself: copy
 `skills/wordpress-to-strapi-migration/templates/wordpress/strapi-migration-helper.php` from this
@@ -566,14 +566,21 @@ site, including drafts and custom fields.
 
 You will give it to Claude in section 3.
 
-**Step 7. Download this repo.** The migration skill lives here. Open a terminal and run:
+**Step 7. Install the migration skill.** Open a terminal and run:
 
 ```bash
-git clone https://github.com/PaulBratslavsky/wordpress-to-strapi-demo.git
+npx skills add PaulBratslavsky/wordpress-to-strapi-demo -g --agent claude-code --yes
 ```
 
+You should see: `✓ wordpress-to-strapi-migration (copied)` and
+`→ ~/.claude/skills/wordpress-to-strapi-migration`.
+
+This copies only the skill folder into `~/.claude/skills/`, where Claude Code finds it from any
+project. You do not need the rest of this repo. It needs Node.js 20 or newer, which Strapi needs
+anyway.
+
 > **Not using Local?** The same site can be built on any WordPress 6.5+ install from the plugin in
-> this repo. Run `./wordpress/build-plugin-zip.sh`, then on the site run
+> this repo. Clone the repo, run `./wordpress/build-plugin-zip.sh`, then on the site run
 > `wp theme install inspiro --activate`,
 > `wp plugin install elementor wpzoom-portfolio custom-post-type-ui advanced-custom-fields --activate`,
 > `wp plugin install wordpress/dist/northfield-demo.zip --activate` and `wp northfield seed`.
@@ -595,17 +602,19 @@ to open the project folder as a database and stops with
 Start it with `npm run develop`, create your admin user, then go to Settings, API Tokens, Create
 new API Token and choose Full access. Keep that token.
 
-### 3. Open the repo in Claude Code and ask
+### 3. Open Claude Code and ask
 
-The skill lives at `.claude/skills/wordpress-to-strapi-migration/`, so Claude Code finds it when
-you open this repo. To use it on another project, copy that folder into `~/.claude/skills/`.
+In a terminal, go to the folder that contains `my-strapi` and run `claude`. The skill you
+installed in step 7 is already available.
 
-Then describe your situation, pasting the application password from step 6:
+Then describe your situation, pasting the application password from section 1 and the API token
+from section 2:
 
 ```
 Migrate my WordPress site at http://northfield.local into the Strapi project
 at ./my-strapi, running on http://localhost:1337. My WordPress user is admin and
-the application password is xxxx xxxx xxxx xxxx xxxx xxxx. Start with a dry run.
+the application password is xxxx xxxx xxxx xxxx xxxx xxxx. The Strapi API token
+is <your token>. Start with a dry run.
 ```
 
 Claude copies the engine, installs it, writes the password into the engine's `.env` file, and
