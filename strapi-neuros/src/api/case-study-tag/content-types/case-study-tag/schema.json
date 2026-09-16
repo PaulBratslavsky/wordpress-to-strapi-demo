@@ -1,0 +1,32 @@
+{
+  "kind": "collectionType",
+  "collectionName": "case_study_tags",
+  "info": {
+    "singularName": "case-study-tag",
+    "pluralName": "case-study-tags",
+    "displayName": "Case Study Tag",
+    "description": "Migrated from WordPress (taxonomy: neuros_case_study_tag)"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string"
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "name"
+    },
+    "wpId": {
+      "type": "integer"
+    },
+    "wpSite": {
+      "type": "string"
+    },
+    "wpLink": {
+      "type": "string"
+    }
+  }
+}

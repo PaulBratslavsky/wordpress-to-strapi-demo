@@ -1,0 +1,77 @@
+{
+  "kind": "collectionType",
+  "collectionName": "services",
+  "info": {
+    "singularName": "service",
+    "pluralName": "services",
+    "displayName": "Service",
+    "description": "Migrated from WordPress (postType: services)"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "string"
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "title"
+    },
+    "content": {
+      "type": "blocks"
+    },
+    "excerpt": {
+      "type": "text"
+    },
+    "featuredImage": {
+      "type": "media",
+      "multiple": false,
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos",
+        "audios"
+      ]
+    },
+    "menuOrder": {
+      "type": "integer"
+    },
+    "publishedDate": {
+      "type": "datetime"
+    },
+    "wpId": {
+      "type": "integer"
+    },
+    "wpSite": {
+      "type": "string"
+    },
+    "wpLink": {
+      "type": "string"
+    },
+    "tagline": {
+      "type": "string"
+    },
+    "startingPrice": {
+      "type": "integer"
+    },
+    "timelineWeeks": {
+      "type": "integer"
+    },
+    "deliverables": {
+      "type": "text"
+    },
+    "icon": {
+      "type": "string"
+    },
+    "featured": {
+      "type": "boolean"
+    },
+    "relatedProjects": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::portfolio-item.portfolio-item"
+    }
+  }
+}

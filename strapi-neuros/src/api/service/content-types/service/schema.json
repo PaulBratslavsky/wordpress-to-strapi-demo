@@ -1,0 +1,91 @@
+{
+  "kind": "collectionType",
+  "collectionName": "services",
+  "info": {
+    "singularName": "service",
+    "pluralName": "services",
+    "displayName": "Service",
+    "description": "Migrated from WordPress (postType: neuros_service)"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "string"
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "title"
+    },
+    "content": {
+      "type": "dynamiczone",
+      "components": [
+        "sections.rich-text",
+        "sections.image",
+        "sections.gallery",
+        "sections.embed",
+        "sections.table",
+        "sections.code",
+        "sections.quote",
+        "sections.cta",
+        "sections.feature",
+        "sections.hero"
+      ]
+    },
+    "excerpt": {
+      "type": "text"
+    },
+    "featuredImage": {
+      "type": "media",
+      "multiple": false,
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos",
+        "audios"
+      ]
+    },
+    "servicesCategory": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::services-category.services-category"
+    },
+    "servicesTag": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::services-tag.services-tag"
+    },
+    "publishedDate": {
+      "type": "datetime"
+    },
+    "wpId": {
+      "type": "integer"
+    },
+    "wpSite": {
+      "type": "string"
+    },
+    "wpLink": {
+      "type": "string"
+    },
+    "iconSvg": {
+      "type": "blocks"
+    },
+    "description": {
+      "type": "blocks"
+    },
+    "titleStatus": {
+      "type": "string"
+    },
+    "pageTopBorderRadius": {
+      "type": "string"
+    },
+    "subtitle": {
+      "type": "string"
+    },
+    "mediaStatus": {
+      "type": "string"
+    }
+  }
+}

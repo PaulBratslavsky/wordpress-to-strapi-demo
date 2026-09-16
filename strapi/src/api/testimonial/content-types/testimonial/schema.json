@@ -1,0 +1,55 @@
+{
+  "kind": "collectionType",
+  "collectionName": "testimonials",
+  "info": {
+    "singularName": "testimonial",
+    "pluralName": "testimonials",
+    "displayName": "Testimonial",
+    "description": "Migrated from WordPress (postType: testimonials)"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "string"
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "title"
+    },
+    "content": {
+      "type": "blocks"
+    },
+    "publishedDate": {
+      "type": "datetime"
+    },
+    "wpId": {
+      "type": "integer"
+    },
+    "wpSite": {
+      "type": "string"
+    },
+    "wpLink": {
+      "type": "string"
+    },
+    "personName": {
+      "type": "string"
+    },
+    "personTitle": {
+      "type": "string"
+    },
+    "company": {
+      "type": "string"
+    },
+    "rating": {
+      "type": "integer"
+    },
+    "project": {
+      "type": "relation",
+      "relation": "manyToOne",
+      "target": "api::portfolio-item.portfolio-item"
+    }
+  }
+}

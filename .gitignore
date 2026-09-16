@@ -7,6 +7,13 @@ reference-projects/
 # Built plugin zip (attach to a GitHub release instead)
 wordpress/dist/
 
+# Strapi projects: keep the content-type schemas and config, not the noise.
+# Lockfiles are ~20k lines each and the types are regenerated on every boot.
+strapi/package-lock.json
+strapi-neuros/package-lock.json
+strapi/types/generated/
+strapi-neuros/types/generated/
+
 # Migration run artifacts
 node_modules/
 .env

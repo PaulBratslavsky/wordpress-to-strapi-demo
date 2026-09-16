@@ -1,0 +1,32 @@
+{
+  "kind": "collectionType",
+  "collectionName": "services_categories",
+  "info": {
+    "singularName": "services-category",
+    "pluralName": "services-categories",
+    "displayName": "Service Category",
+    "description": "Migrated from WordPress (taxonomy: neuros_services_category)"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string"
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "name"
+    },
+    "wpId": {
+      "type": "integer"
+    },
+    "wpSite": {
+      "type": "string"
+    },
+    "wpLink": {
+      "type": "string"
+    }
+  }
+}

@@ -1,0 +1,71 @@
+{
+  "kind": "collectionType",
+  "collectionName": "teams",
+  "info": {
+    "singularName": "team",
+    "pluralName": "teams",
+    "displayName": "Team member",
+    "description": "Migrated from WordPress (postType: team)"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "string"
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "title"
+    },
+    "content": {
+      "type": "blocks"
+    },
+    "featuredImage": {
+      "type": "media",
+      "multiple": false,
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos",
+        "audios"
+      ]
+    },
+    "department": {
+      "type": "relation",
+      "relation": "manyToMany",
+      "target": "api::department.department"
+    },
+    "menuOrder": {
+      "type": "integer"
+    },
+    "publishedDate": {
+      "type": "datetime"
+    },
+    "wpId": {
+      "type": "integer"
+    },
+    "wpSite": {
+      "type": "string"
+    },
+    "wpLink": {
+      "type": "string"
+    },
+    "role": {
+      "type": "string"
+    },
+    "email": {
+      "type": "email"
+    },
+    "profileUrl": {
+      "type": "string"
+    },
+    "startDate": {
+      "type": "date"
+    },
+    "specialties": {
+      "type": "json"
+    }
+  }
+}
