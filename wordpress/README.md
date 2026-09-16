@@ -15,7 +15,17 @@ A WordPress plugin that builds **Northfield Studio**, a small agency website. It
 
 ## Quick start
 
-You need [Local](https://localwp.com) (free, macOS / Windows / Linux). Any other WordPress 6.5+ install works too.
+You need [Local](https://localwp.com) (free, macOS / Windows / Linux).
+
+1. Download [`northfield-local-site.zip`](https://github.com/PaulBratslavsky/wordpress-to-strapi-demo/releases/latest/download/northfield-local-site.zip). Leave it zipped.
+2. In Local, click **+**, drag the zip onto the *import a site* box, name the site `northfield`, choose **Preferred**, and click **Import site**.
+3. Click **WP Admin** and log in as `admin` / `password`.
+
+The theme, plugins and content are already in the zip. To rebuild it from a running site, run `./wordpress/build-local-site.sh`.
+
+### Building it from the plugin instead
+
+Use this on any WordPress 6.5+ install, or if you want to see how the site is put together.
 
 1. **Create the site.** In Local, click **+ → Create a new site**, name it `northfield`, choose **Preferred**, and set an admin username and password. Then click **WP Admin**.
 2. **Install the theme.** Go to **Appearance → Themes → Add New**, search for **Inspiro**, then **Install** and **Activate**.
@@ -29,7 +39,7 @@ You need [Local](https://localwp.com) (free, macOS / Windows / Linux). Any other
 
 Visit the site: you should see the Northfield Studio home page.
 
-> **Where's `northfield-demo.zip`?** Download it from the repository's GitHub Releases, or build it with `./wordpress/build-plugin-zip.sh`. The script writes `wordpress/dist/northfield-demo.zip`.
+> **Where's `northfield-demo.zip`?** Build it with `./wordpress/build-plugin-zip.sh`. The script writes `wordpress/dist/northfield-demo.zip`.
 
 ### Using the command line instead
 
@@ -106,7 +116,7 @@ Removal deletes everything the plugin created: entries, images, terms, menus, au
 
 | Problem | Fix |
 |---|---|
-| Local says *"The archive has no wp-content folder"* | Local's import expects a Local site export, not a theme or plugin zip. Create a blank site instead (step 1). |
+| Local says *"The archive has no wp-content folder"* | You dragged in `northfield-demo.zip`, which is a plugin. Local's import box takes `northfield-local-site.zip`. |
 | **Tools → Northfield Demo** lists missing plugins | Install and activate the plugins named in the notice, then reload the page. |
 | No **Application Passwords** section on the profile page | The site isn't on HTTPS and isn't marked as a local environment. Local sets `WP_ENVIRONMENT_TYPE` to `local` for you. On other hosts, enable HTTPS. |
 

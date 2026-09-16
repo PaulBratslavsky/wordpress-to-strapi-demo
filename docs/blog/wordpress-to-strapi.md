@@ -21,6 +21,8 @@ We will go through what a WordPress migration actually involves, what to expect 
 site, and how to run one with Claude Code. The demo site here is a practice ground. The goal is
 that you can do this to a site you care about.
 
+![001-wp-to-strapi.png](images/001-wp-to-strapi.png)
+
 ## What a migration actually moves
 
 Strapi is a headless CMS. Headless means it has no front end of its own. It stores your content
@@ -124,8 +126,7 @@ those content types and build pages against them, and Strapi ships an MCP server
 can query your real content while you work rather than guessing at the shape of it. Point it at
 `/mcp` with an admin token and the tools are generated from your own schema.
 
-Plan for it as a second piece of work. Just do not price it the way you would have three years
-ago.
+Plan for it as a second piece of work. 
 
 **Involve whoever edits the site.** The content model you end up with is what they will use every
 day. A field called `field2`, or a page that arrives as one undifferentiated block of rich text,
@@ -172,7 +173,7 @@ content is in and you can see it.
 that redesigns the model at the same time is two risky projects sharing one deadline. Normalize
 the structure, not the words: changing how a field is shaped is a contained job, rewriting
 everybody's copy is a different one with different reviewers. If you cannot say what a change
-buys you, keep the shape you have and move on.
+brings you, keep the shape you have and move on.
 
 ## What to anticipate on your own site
 
@@ -181,10 +182,10 @@ worth checking before you begin.
 
 ### Content WordPress hides from its own API
 
-Start here, because this is the only failure in a migration that stays quiet. Everything else
-tells you when it goes wrong: an image that will not upload throws an error, a field of the
-wrong type gets rejected. This one does not. The migration finishes, every count matches, and
-content you did not know was missing is missing.
+Check this one first, because it is the only problem that gives you no warning. Most migration
+problems show up as errors: an image fails to upload, or a field gets rejected because it is the
+wrong type. This one produces no error at all. The migration finishes, the counts match, and
+some of your content never made it across.
 
 It happens because WordPress holds two different answers to "what is on this site". The database
 has one. The REST API has another, and the API lists only what somebody opted in.
@@ -222,6 +223,11 @@ northfield_acf_group(
 
 On a real site nobody writes that line. Somebody creates a field group in the ACF admin, leaves
 the REST toggle where it was, and the effect is identical.
+
+In WP Admin those fields are an ordinary panel under the editor, which is why nobody thinks of
+them as hidden:
+
+![The WordPress block editor for the Riverbend Coffee Roasters portfolio post, with an ACF panel titled Project details showing Client, Year, Live site, Launch date and Services provided fields.](images/wp-acf-fields.png)
 
 Here is what those hidden fields look like when they are working:
 
@@ -279,6 +285,12 @@ real date. `year` was the string `"2024"` and is now a number. The three loose `
 are one `results` component. And `wpId` with `wpSite` are what make a second run update this
 entry rather than create another one.
 
+Here is the content type the skill generated for those entries, in Strapi's Content-Type Builder.
+The three `results_*` keys are now one `Results` component with `headline`, `metric` and
+`summary` inside it:
+
+![Strapi's Content-Type Builder showing the Portfolio Post type: relation fields, wpId, wpSite and wpLink, a results component expanded to show headline, metric and summary, and a clientName text field.](images/strapi-content-type.png)
+
 **How to check:** open `http://your-site.local/wp-json/wp/v2/types` in a browser. Compare that
 list against the post types in your WP Admin menu. Anything in the menu but not in the JSON is
 hidden.
@@ -315,6 +327,14 @@ For an Elementor page, the `content.rendered` field the API returns is Elementor
 output: a deep nest of `<div class="elementor-...">` wrappers. The structure you can see on
 screen lives somewhere else, in a post meta field called `_elementor_data`, stored as JSON.
 
+This is what that structure looks like while someone is building it:
+
+![The Elementor editor on the Neuros home page: a panel of theme widgets on the left, the page preview in the middle, and a Structure panel listing the page as a stack of sections.](images/wp-elementor.png)
+
+Each entry in that Structure panel is a section holding widgets, and each widget has its own
+settings. That tree is what `_elementor_data` stores, and it is what a migration has to read if
+the layout is going to survive.
+
 If you flatten the rendered HTML you get the words in the right order and lose the layout. That
 is fine for an article. It is poor for a landing page, which is what people build with page
 builders.
@@ -343,10 +363,10 @@ and see whether it opens in Elementor.
 
 #### One case study, before and after
 
-Neuros builds its case studies in Elementor. Here is one of them on the WordPress side, a
-heading and body text followed by a pair of images:
+Neuros builds its case studies in Elementor. Here is one of them on the WordPress side: a
+heading and body text, with a pair of images further down the page:
 
-![A Neuros case study page titled The challenge, with two paragraphs of body text and two images below them.](images/wp-case-study.png)
+![A Neuros case study page with a sidebar listing the client's sector and offering, and a main column headed The challenge followed by paragraphs of body text.](images/wp-case-study.png)
 
 And the same entry after migration, in Strapi's Content Manager:
 
@@ -369,7 +389,7 @@ content: 5 components
   5. sections.rich-text    1,319 characters
 ```
 
-That is what the dynamic zone buys. An editor can reorder those five, delete one, or add a
+That is what the dynamic zone brings. An editor can reorder those five, delete one, or add a
 sixth, without touching markup. The two images are real entries in Strapi's media library
 rather than URLs pointing back at WordPress. In a Blocks field the same page arrives as one
 long body, which reads the same on the page and cannot be rearranged by anyone who is not
@@ -477,12 +497,28 @@ describe your site instead and Claude runs them for you, stopping at step 3 to w
 Do this on the demo site before you do it on anything you care about. It takes about ten
 minutes and it teaches you what the review step feels like.
 
-### 1. Build the demo WordPress site
+### 1. Set up the demo WordPress site
 
-Install [Local](https://localwp.com) and create a blank WordPress site. Install the Inspiro
-theme and four free plugins: Elementor, WPZOOM Portfolio, Custom Post Type UI, and Advanced
-Custom Fields. Then clone this repo, upload the `northfield-demo` plugin from `wordpress/`, and
-go to Tools, Northfield Demo, Create demo content.
+The demo site comes as a single file you import into Local. The theme, the plugins and all the
+content are already inside it, so there is nothing to install. Do these steps in order. Each one
+says what you should see before you move on.
+
+**Step 1. Install Local.** Download it from [localwp.com](https://localwp.com), install it and
+open it. Local is a free app that runs WordPress on your own machine.
+
+**Step 2. Download the demo site.** Download
+[northfield-local-site.zip](https://github.com/PaulBratslavsky/wordpress-to-strapi-demo/releases/latest/download/northfield-local-site.zip)
+(51 MB). Leave it zipped.
+
+**Step 3. Import it into Local.** In Local, click the **+** button at the bottom left. On the
+**Create a site** screen, drag the zip onto the box that says *drag your file into the window to
+import a site*. Then:
+
+1. Type `northfield` as the site name and click **Continue**.
+2. Choose **Preferred** and click **Import site**.
+
+You should see: `northfield` in Local's site list with a green dot. Click **Open site** and
+`http://northfield.local` shows this:
 
 ![The Northfield Studio home page: a dark navigation bar, the headline "Brand, web and product design for independent businesses", and a photograph of a studio desk.](images/wp-home.png)
 
@@ -491,10 +527,56 @@ members, 4 testimonials, 6 projects, 30 images and 26 terms. It has the hard par
 A post type hidden from the API. ACF fields hidden from the API. A classic-editor post full of
 shortcodes. A draft with no slug. A scheduled post. Links to a domain that no longer exists.
 
-Copy `skills/wordpress-to-strapi-migration/templates/wordpress/strapi-migration-helper.php` into
-`wp-content/mu-plugins/`, then create an application password under Users, Profile, Application
-Passwords. An application password is a separate password WordPress accepts for API requests.
-Without one you get published content only, and no custom fields.
+**Step 4. Log in.** In Local, click **WP Admin**, then log in with:
+
+- Username: `admin`
+- Password: `password`
+
+These are demo credentials for a site that only runs on your machine. Change them under
+**Users, Profile** if you like.
+
+**Step 5. Download this repo.** The migration skill and the helper plugin live here. Open your
+normal terminal and run:
+
+```bash
+cd ~
+git clone https://github.com/PaulBratslavsky/wordpress-to-strapi-demo.git
+```
+
+**Step 6. Open the site shell.** In Local, right-click `northfield` in the site list and choose
+**Open site shell**. A terminal opens with WP-CLI, WordPress's command-line tool, already
+connected to this site. Run the next two steps in that window.
+
+**Step 7. Add the migration helper.** This small plugin makes the hidden content readable.
+WordPress loads anything in `mu-plugins` automatically, so there is nothing to activate:
+
+```bash
+MU="$(wp eval 'echo WP_CONTENT_DIR;')/mu-plugins"
+mkdir -p "$MU"
+cp ~/wordpress-to-strapi-demo/skills/wordpress-to-strapi-migration/templates/wordpress/strapi-migration-helper.php "$MU/"
+curl -s http://northfield.local/wp-json/strapi-migration/v1/info
+```
+
+You should see: `{"version":"1.0.0","forced_post_types":["team"],...}`. Delete the file when
+your migration is finished.
+
+**Step 8. Create an application password.** This is the password the migration uses to read
+the site, including drafts and custom fields:
+
+```bash
+wp user application-password create admin strapi-migration --porcelain
+```
+
+You should see: one line of letters and numbers. Copy it now, because WordPress will not show it
+again. You will give it to Claude in section 3.
+
+> **Not using Local?** The same site can be built on any WordPress 6.5+ install from the plugin in
+> this repo. Run `./wordpress/build-plugin-zip.sh`, then on the site run
+> `wp theme install inspiro --activate`,
+> `wp plugin install elementor wpzoom-portfolio custom-post-type-ui advanced-custom-fields --activate`,
+> `wp plugin install wordpress/dist/northfield-demo.zip --activate` and `wp northfield seed`.
+> The [WordPress setup guide](https://github.com/PaulBratslavsky/wordpress-to-strapi-demo/tree/main/wordpress)
+> has the click-through version.
 
 ### 2. Create a Strapi project
 
@@ -519,7 +601,7 @@ Then describe your situation:
 
 ```
 Migrate my WordPress site at http://northfield.local into the Strapi project
-at ./my-strapi, running on http://localhost:1337. My WordPress user is paul and
+at ./my-strapi, running on http://localhost:1337. My WordPress user is admin and
 the application password is in migrate/.env. Start with a dry run.
 ```
 
