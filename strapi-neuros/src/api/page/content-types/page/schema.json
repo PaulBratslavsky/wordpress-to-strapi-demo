@@ -1,0 +1,62 @@
+{
+  "kind": "collectionType",
+  "collectionName": "pages",
+  "info": {
+    "singularName": "page",
+    "pluralName": "pages",
+    "displayName": "Page",
+    "description": "Migrated from WordPress (postType: page)"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "title": {
+      "type": "string"
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "title"
+    },
+    "content": {
+      "type": "dynamiczone",
+      "components": [
+        "sections.rich-text",
+        "sections.image",
+        "sections.gallery",
+        "sections.embed",
+        "sections.table",
+        "sections.code",
+        "sections.quote",
+        "sections.cta",
+        "sections.feature",
+        "sections.hero"
+      ]
+    },
+    "excerpt": {
+      "type": "text"
+    },
+    "publishedDate": {
+      "type": "datetime"
+    },
+    "wpStatus": {
+      "type": "string"
+    },
+    "wpId": {
+      "type": "integer"
+    },
+    "wpSite": {
+      "type": "string"
+    },
+    "wpLink": {
+      "type": "string"
+    },
+    "topBorderRadius": {
+      "type": "string"
+    },
+    "bodyLinesStatus": {
+      "type": "string"
+    }
+  }
+}

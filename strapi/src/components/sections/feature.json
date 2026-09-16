@@ -1,0 +1,33 @@
+{
+  "collectionName": "components_sections_features",
+  "info": {
+    "displayName": "Feature",
+    "icon": "star",
+    "description": "Migrated from WordPress"
+  },
+  "options": {},
+  "attributes": {
+    "title": {
+      "type": "string"
+    },
+    "text": {
+      "type": "text"
+    },
+    "icon": {
+      "type": "string"
+    },
+    "image": {
+      "type": "media",
+      "multiple": false,
+      "allowedTypes": [
+        "images",
+        "files",
+        "videos",
+        "audios"
+      ]
+    },
+    "url": {
+      "type": "string"
+    }
+  }
+}

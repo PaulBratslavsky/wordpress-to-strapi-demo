@@ -1,0 +1,23 @@
+{
+  "name": "wordpress-to-strapi-migrate",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Migrate content from a WordPress site (via its REST API) into Strapi v5.",
+  "scripts": {
+    "export": "node export.js",
+    "analyze": "node analyze.js",
+    "generate": "node generate.js",
+    "migrate": "node migrate.js",
+    "verify": "node verify.js"
+  },
+  "engines": { "node": ">=20.0.0" },
+  "dependencies": {
+    "@joplin/turndown-plugin-gfm": "^1.0.68",
+    "dotenv": "^17.4.2",
+    "he": "^1.2.0",
+    "linkedom": "^0.18.13",
+    "marked": "^18.0.12",
+    "turndown": "^7.2.4"
+  }
+}

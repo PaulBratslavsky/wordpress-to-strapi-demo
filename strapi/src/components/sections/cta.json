@@ -1,0 +1,23 @@
+{
+  "collectionName": "components_sections_ctas",
+  "info": {
+    "displayName": "Cta",
+    "icon": "cursor",
+    "description": "Migrated from WordPress"
+  },
+  "options": {},
+  "attributes": {
+    "heading": {
+      "type": "string"
+    },
+    "text": {
+      "type": "text"
+    },
+    "label": {
+      "type": "string"
+    },
+    "url": {
+      "type": "string"
+    }
+  }
+}

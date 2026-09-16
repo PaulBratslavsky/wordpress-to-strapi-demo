@@ -1,0 +1,17 @@
+{
+  "collectionName": "components_sections_quotes",
+  "info": {
+    "displayName": "Quote",
+    "icon": "quote",
+    "description": "Migrated from WordPress"
+  },
+  "options": {},
+  "attributes": {
+    "quote": {
+      "type": "text"
+    },
+    "attribution": {
+      "type": "string"
+    }
+  }
+}

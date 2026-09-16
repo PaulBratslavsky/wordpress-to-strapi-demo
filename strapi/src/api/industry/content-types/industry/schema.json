@@ -1,0 +1,32 @@
+{
+  "kind": "collectionType",
+  "collectionName": "industries",
+  "info": {
+    "singularName": "industry",
+    "pluralName": "industries",
+    "displayName": "Industry",
+    "description": "Migrated from WordPress (taxonomy: industry)"
+  },
+  "options": {
+    "draftAndPublish": true
+  },
+  "pluginOptions": {},
+  "attributes": {
+    "name": {
+      "type": "string"
+    },
+    "slug": {
+      "type": "uid",
+      "targetField": "name"
+    },
+    "wpId": {
+      "type": "integer"
+    },
+    "wpSite": {
+      "type": "string"
+    },
+    "wpLink": {
+      "type": "string"
+    }
+  }
+}
