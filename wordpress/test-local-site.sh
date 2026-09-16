@@ -52,7 +52,6 @@ mv "$WORK/zip/wp-content" "$SITE/wp-content"
 
 mysql -e "DROP DATABASE IF EXISTS $DB; CREATE DATABASE $DB"
 mysql "$DB" < "$WORK/zip/northfield.sql"
-mysql "$DB" -e "UPDATE wp_options SET option_value='$URL' WHERE option_name IN ('siteurl','home')"
 
 cat > "$SITE/wp-config.php" <<PHP
 <?php
@@ -69,6 +68,14 @@ define( 'WP_DEBUG_DISPLAY', true );
 if ( ! defined( 'ABSPATH' ) ) define( 'ABSPATH', __DIR__ . '/' );
 require_once ABSPATH . 'wp-settings.php';
 PHP
+
+# Local's import rewrites the old address to the new one across the database,
+# serialized-data aware but blind to JSON-escaped copies. WP-CLI's search-replace
+# behaves the same way, so the booted site sees what an imported one sees.
+WPCLI="/Applications/Local.app/Contents/Resources/extraResources/bin/wp-cli/wp-cli.phar"
+OLD_URL="$(mysql -N "$DB" -e "SELECT option_value FROM wp_options WHERE option_name='siteurl'")"
+"$PHP" -c "$PHP_INI" "$WPCLI" --path="$SITE" search-replace "$OLD_URL" "$URL" --all-tables --quiet
+echo "Moved: $OLD_URL -> $URL"
 
 cat > "$WORK/router.php" <<'PHP'
 <?php
@@ -116,7 +123,6 @@ check "helper under Must-Use"   "$URL/wp-admin/plugins.php?plugin_status=mustuse
 check "helper exposes Team"     "$URL/?rest_route=/wp/v2/team"      '"type":"team"'
 
 # the post has readers create an application password and call the helper with it
-WPCLI="/Applications/Local.app/Contents/Resources/extraResources/bin/wp-cli/wp-cli.phar"
 APP_PASS="$("$PHP" -c "$PHP_INI" "$WPCLI" --path="$SITE" user application-password create admin boot-check --porcelain 2>/dev/null || true)"
 info="$(curl -s -u "admin:$APP_PASS" "$URL/?rest_route=/strapi-migration/v1/info")"
 if [ -n "$APP_PASS" ] && grep -qF '"forced_post_types":["team"]' <<<"$info"; then
@@ -129,6 +135,35 @@ inactive="$(curl -s -b "$JAR" "$URL/wp-admin/plugins.php" | grep -oE 'class="ina
 if [ -n "$inactive" ]; then echo "FAIL  inactive plugins: $inactive"; FAIL=1; fi
 if grep -qiE 'Fatal error|Parse error' "$WORK/server.log"; then
   echo "FAIL  PHP errors in the server log:"; grep -iE 'Fatal error|Parse error' "$WORK/server.log" | head -3 || true; FAIL=1
+fi
+
+# every image on the pages readers look at must load from the new address
+images() { # page url -> one absolute image url per line
+  curl -sL "$1" | grep -oE '(src|srcset|data-src)="[^"]+"|url\([^)]+\)' \
+    | sed -E 's/^(src|srcset|data-src)="//; s/"$//; s/^url\(["'"'"']?//; s/["'"'"']?\)$//' \
+    | tr ',' '\n' | awk '{print $1}' | grep -iE '\.(jpe?g|png|webp|gif|svg)(\?|$)' \
+    | sed -E "s#^/([^/])#$URL/\\1#" | sort -u
+}
+ABOUT="$(mysql -N "$DB" -e "SELECT ID FROM wp_posts WHERE post_type='page' AND post_name='about'")"
+bad=""; count=0
+for page in "$URL/" "$URL/?page_id=$ABOUT" "$URL/?post_type=portfolio_item&name=riverbend-coffee-roasters" "$URL/?p=$(mysql -N "$DB" -e "SELECT ID FROM wp_posts WHERE post_type='post' AND post_status='publish' LIMIT 1")"; do
+  while read -r img; do
+    [ -z "$img" ] && continue
+    count=$((count + 1))
+    case "$img" in
+      *old.northfield-studio.example*) count=$((count - 1)); continue ;;  # the demo's deliberate dead link
+    esac
+    case "$img" in "$URL"/*) ;; *) bad+="    wrong host: $img"$'\n'; continue ;; esac
+    code="$(curl -s -o /dev/null -w '%{http_code}' "$img")"
+    [ "$code" = 200 ] || bad+="    $code: $img"$'\n'
+  done < <(images "$page")
+done
+if [ "$count" -lt 10 ]; then
+  echo "FAIL  images: only $count found on the checked pages"; FAIL=1
+elif [ -n "$bad" ]; then
+  echo "FAIL  images: $(printf '%s' "$bad" | grep -c .) of $count do not load"; printf '%s' "$bad" | head -8; FAIL=1
+else
+  echo "ok    all $count images load from $URL"
 fi
 
 [ "$FAIL" = 0 ] && echo "PASS  the zip boots and works" || { echo "The zip is broken; do not publish it." >&2; exit 1; }

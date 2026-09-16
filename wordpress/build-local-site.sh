@@ -76,6 +76,20 @@ DELETE FROM wp_options WHERE option_name = 'using_application_passwords';
 DELETE FROM wp_options WHERE option_name LIKE '%\_transient\_%';
 DELETE FROM wp_options WHERE option_name LIKE '%font\_files%';
 
+-- Elementor stores layouts as JSON, where URLs are written http:\\/\\/host\\/...
+-- Local's import rewrites the site address but not that escaped form, so an
+-- imported site under any other name loads its Elementor images from here.
+-- (Renaming a site in Local has the same blind spot, so the source may hold
+-- either name.) Make those links relative, and drop the caches Elementor
+-- rebuilds itself.
+UPDATE wp_postmeta
+   SET meta_value = REPLACE(REPLACE(meta_value,
+         'http:\\\\/\\\\/$DOMAIN\\\\/', '\\\\/'),
+         'http:\\\\/\\\\/$SHIP_DOMAIN\\\\/', '\\\\/')
+ WHERE meta_key = '_elementor_data';
+DELETE FROM wp_postmeta WHERE meta_key IN ('_elementor_element_cache', '_elementor_css');
+DELETE FROM wp_options  WHERE option_name LIKE '\\_elementor\\_global\\_css' OR option_name LIKE 'elementor\\_%\\_cache%';
+
 -- editor leftovers
 DELETE FROM wp_posts WHERE post_status = 'auto-draft';
 DELETE FROM wp_posts WHERE post_type IN ('revision', 'customize_changeset', 'oembed_cache');
@@ -95,6 +109,12 @@ if [ "$DOMAIN" != "northfield.local" ]; then
   LC_ALL=C sed -i '' "s/${DOMAIN//./\\.}/$SHIP_DOMAIN/g" "$WORK/northfield.sql"
 fi
 
+# no absolute, JSON-escaped site URLs may survive: Local's import would miss them
+if grep -qF -- "http:\\\\/\\\\/$SHIP_DOMAIN" "$WORK/northfield.sql"; then
+  echo "Refusing to build: JSON-escaped site URLs remain, and an import under another name would break them." >&2
+  exit 1
+fi
+
 # refuse to ship anything that looks like it came from this machine or its owner
 OWNER_EMAIL="$(mysql -N local -e 'SELECT user_email FROM wp_users WHERE ID = 1')"
 for needle in "$HOME" "$OWNER_EMAIL" "'_application_passwords'" "'session_tokens'"; do
@@ -112,6 +132,7 @@ EXCLUDES=(
   /wp-content/fonts/
   /wp-content/cache/
   /wp-content/debug.log
+  /wp-content/uploads/elementor/css/
 )
 RSYNC_ARGS=(-a --exclude '.DS_Store')
 for e in "${EXCLUDES[@]}"; do RSYNC_ARGS+=(--exclude "$e"); done
@@ -124,7 +145,7 @@ cp ../skills/wordpress-to-strapi-migration/templates/wordpress/strapi-migration-
 
 # the copy must match the site file for file, apart from the exclusions above
 list() { (cd "$1" && find wp-content -type f ! -name .DS_Store | sort); }
-missing="$(comm -23 <(list "$SITE_PATH/app/public" | grep -vE '^wp-content/(upgrade/|fonts/|cache/|debug\.log$)') <(list "$WORK"))"
+missing="$(comm -23 <(list "$SITE_PATH/app/public" | grep -vE '^wp-content/(upgrade/|fonts/|cache/|debug\.log$|uploads/elementor/css/)') <(list "$WORK"))"
 if [ -n "$missing" ]; then
   echo "Refusing to build: these files did not make it into the copy:" >&2
   echo "$missing" | head -20 >&2
