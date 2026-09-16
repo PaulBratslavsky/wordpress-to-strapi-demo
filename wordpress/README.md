@@ -58,12 +58,9 @@ wp northfield seed
 
 The migration reads WordPress through its REST API. The Local site zip already includes the helper plugin, so if you imported it you only need step 2. Before you run it:
 
-1. **Add the helper plugin.**
-   - In Local, right-click the site → **Go to site folder**.
-   - Open `app/public/wp-content/` and create a `mu-plugins` folder if it doesn't exist.
-   - Copy [`strapi-migration-helper.php`](../skills/wordpress-to-strapi-migration/templates/wordpress/strapi-migration-helper.php) into it.
+1. **Install the helper plugin.** Download [`strapi-migration-helper.zip`](https://github.com/PaulBratslavsky/wordpress-to-strapi-demo/releases/latest/download/strapi-migration-helper.zip), then in WP Admin go to **Plugins → Add Plugin → Upload Plugin**, choose the zip, and click **Install Now** and **Activate Plugin**.
 
-   It makes the hidden content types and fields readable. Delete it when you're done.
+   It makes the hidden content types and fields readable. Deactivate and delete it when you're done. To build the zip yourself, run `./wordpress/build-helper-zip.sh`.
 2. **Create an application password.** In WP Admin, go to **Users → Profile → Application Passwords**, enter `strapi-migration`, click **Add**, and copy the password. Local sites accept application passwords over plain HTTP. Other hosts require HTTPS.
 
 ---

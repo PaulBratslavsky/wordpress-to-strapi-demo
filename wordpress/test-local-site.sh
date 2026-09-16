@@ -7,6 +7,10 @@
 # database, and Local's own PHP serving it. It needs one running Local site to
 # borrow a MySQL server from (southfield.local by default).
 #
+# It also checks the helper's own install path: remove it, confirm the hidden
+# Team type disappears from the API, install dist/strapi-migration-helper.zip the
+# way the post tells readers to, and confirm Team comes back.
+#
 # Usage: ./wordpress/test-local-site.sh [zip] [domain-of-a-running-local-site]
 set -euo pipefail
 
@@ -119,7 +123,7 @@ check "dashboard"               "$URL/wp-admin/"                     "Dashboard"
 check "plugins, all active"     "$URL/wp-admin/plugins.php"          "Elementor"
 check "Elementor editor"        "$URL/wp-admin/post.php?post=$(mysql -N "$DB" -e "SELECT post_id FROM wp_postmeta WHERE meta_key='_elementor_edit_mode' LIMIT 1")&action=elementor" "elementor"
 check "ACF field groups"        "$URL/wp-admin/edit.php?post_type=acf-field-group" "Project details"
-check "helper under Must-Use"   "$URL/wp-admin/plugins.php?plugin_status=mustuse" "Strapi Migration Helper"
+check "helper listed in Plugins" "$URL/wp-admin/plugins.php"         "Strapi Migration Helper"
 check "helper exposes Team"     "$URL/?rest_route=/wp/v2/team"      '"type":"team"'
 
 # the post has readers create an application password and call the helper with it
@@ -164,6 +168,24 @@ elif [ -n "$bad" ]; then
   echo "FAIL  images: $(printf '%s' "$bad" | grep -c .) of $count do not load"; printf '%s' "$bad" | head -8; FAIL=1
 else
   echo "ok    all $count images load from $URL"
+fi
+
+# the helper's install path, as the post describes it for readers' own sites
+HELPER_ZIP="$(pwd)/dist/strapi-migration-helper.zip"
+wp() { "$PHP" -c "$PHP_INI" "$WPCLI" --path="$SITE" "$@"; }
+team_code() { curl -s -o /dev/null -w '%{http_code}' "$URL/?rest_route=/wp/v2/team"; }
+if [ ! -f "$HELPER_ZIP" ]; then
+  echo "FAIL  helper zip missing: run ./wordpress/build-helper-zip.sh"; FAIL=1
+else
+  wp plugin deactivate strapi-migration-helper --quiet && wp plugin delete strapi-migration-helper --quiet
+  without="$(team_code)"
+  wp plugin install "$HELPER_ZIP" --activate --quiet
+  with="$(team_code)"
+  if [ "$without" = 404 ] && [ "$with" = 200 ]; then
+    echo "ok    helper zip installs and brings back Team (404 without it, 200 with it)"
+  else
+    echo "FAIL  helper zip install: Team was $without without the helper, $with with it"; FAIL=1
+  fi
 fi
 
 [ "$FAIL" = 0 ] && echo "PASS  the zip boots and works" || { echo "The zip is broken; do not publish it." >&2; exit 1; }

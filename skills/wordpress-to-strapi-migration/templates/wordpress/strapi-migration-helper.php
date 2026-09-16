@@ -1,12 +1,17 @@
 <?php
 /**
  * Plugin Name: Strapi Migration Helper
- * Description: TEMPORARY. Exposes every public post type, taxonomy and custom field over the WordPress REST API so a WordPress → Strapi migration can read them. Custom fields are only returned to logged-in editors (e.g. via an Application Password). Delete this file when the migration is done.
+ * Description: TEMPORARY. Exposes every public post type, taxonomy and custom field over the WordPress REST API so a WordPress → Strapi migration can read them. Custom fields are only returned to logged-in editors (e.g. via an Application Password). Deactivate and delete this plugin when the migration is done.
  * Version:     1.0.0
  * License:     GPL-2.0-or-later
  *
- * Install: copy this file to wp-content/mu-plugins/ (create the folder if it
- * doesn't exist). Must-use plugins load automatically — nothing to activate.
+ * Install: in WP Admin go to Plugins → Add Plugin → Upload Plugin, choose
+ * strapi-migration-helper.zip, then Install Now and Activate.
+ *
+ * Alternative: copy this file into wp-content/mu-plugins/. Must-use plugins load
+ * before every other plugin, which only matters if a plugin registers its post
+ * types while it is being loaded instead of on the `init` hook (rare).
+ * Use one method, not both.
  *
  * Why it's needed: the REST API only shows post types and taxonomies registered
  * with `show_in_rest => true`, and only custom fields registered with

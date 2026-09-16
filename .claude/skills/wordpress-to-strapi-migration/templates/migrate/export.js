@@ -206,8 +206,9 @@ async function main() {
   if (!helper && wp.authenticated && !hasMeta) {
     console.log(
       '\nTip: no custom fields were exported, and post types registered without REST support are invisible.\n' +
-        'If the site uses a commercial theme, Meta Box, or custom post types, install\n' +
-        'templates/wordpress/strapi-migration-helper.php into wp-content/mu-plugins/ and export again.'
+        'If the site uses a commercial theme, Meta Box, or custom post types, install the\n' +
+        'Strapi Migration Helper (Plugins > Add Plugin > Upload Plugin) and export again:\n' +
+        'https://github.com/PaulBratslavsky/wordpress-to-strapi-demo/releases/latest/download/strapi-migration-helper.zip'
     );
   }
   console.log('\nNext: node analyze.js');
