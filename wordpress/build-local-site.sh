@@ -18,7 +18,7 @@
 # What it leaves out on purpose:
 #   - the migration helper mu-plugin (readers install it as a tutorial step)
 #   - the site owner's email, password, sessions and application passwords
-#   - caches, transients and core default themes
+#   - caches and transients
 set -euo pipefail
 
 DOMAIN="${1:-northfield.local}"
@@ -92,12 +92,28 @@ for needle in "$HOME" "$OWNER_EMAIL" "'_application_passwords'" "'session_tokens
 done
 
 # --- files -------------------------------------------------------------------------
-rsync -a \
-  --exclude 'mu-plugins/strapi-migration-helper.php' \
-  --exclude 'fonts/' --exclude 'upgrade/' --exclude 'cache/' \
-  --exclude 'debug.log' --exclude '.DS_Store' \
-  --exclude 'themes/twenty*' \
-  "$SITE_PATH/app/public/wp-content" "$WORK/"
+# Every pattern is anchored to wp-content/. An unanchored 'upgrade/' also matches
+# plugins/elementor/core/upgrade/, and the imported site dies with a fatal error.
+EXCLUDES=(
+  /wp-content/mu-plugins/strapi-migration-helper.php
+  /wp-content/upgrade/
+  /wp-content/fonts/
+  /wp-content/cache/
+  /wp-content/debug.log
+)
+RSYNC_ARGS=(-a --exclude '.DS_Store')
+for e in "${EXCLUDES[@]}"; do RSYNC_ARGS+=(--exclude "$e"); done
+rsync "${RSYNC_ARGS[@]}" "$SITE_PATH/app/public/wp-content" "$WORK/"
+
+# the copy must match the site file for file, apart from the exclusions above
+list() { (cd "$1" && find wp-content -type f ! -name .DS_Store | sort); }
+missing="$(comm -23 <(list "$SITE_PATH/app/public" | grep -vE '^wp-content/(mu-plugins/strapi-migration-helper\.php|upgrade/|fonts/|cache/|debug\.log$)') <(list "$WORK"))"
+if [ -n "$missing" ]; then
+  echo "Refusing to build: these files did not make it into the copy:" >&2
+  echo "$missing" | head -20 >&2
+  exit 1
+fi
+
 if grep -rqF --include='*.php' --include='*.json' --include='*.log' -- "$HOME" "$WORK/wp-content"; then
   echo "Refusing to build: wp-content contains a path from this machine." >&2
   exit 1

@@ -508,14 +508,20 @@ open it. Local is a free app that runs WordPress on your own machine.
 
 **Step 2. Download the demo site.** Download
 [northfield-local-site.zip](https://github.com/PaulBratslavsky/wordpress-to-strapi-demo/releases/latest/download/northfield-local-site.zip)
-(51 MB). Leave it zipped.
+(80 MB). Leave it zipped.
 
 **Step 3. Import it into Local.** In Local, click the **+** button at the bottom left. On the
 **Create a site** screen, drag the zip onto the box that says *drag your file into the window to
-import a site*. Then:
+import a site*. 
+
+![011-local-setup-1.png](images/011-local-setup-1.png)
+
+Then:
 
 1. Type `northfield` as the site name and click **Continue**.
 2. Choose **Preferred** and click **Import site**.
+
+![011-local-setup-2.png](images/011-local-setup-2.png)
 
 You should see: `northfield` in Local's site list with a green dot. Click **Open site** and
 `http://northfield.local` shows this:
