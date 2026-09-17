@@ -14,7 +14,6 @@
 
 const EXPLANATIONS = {
   'table-flattened': "Tables became plain paragraphs — Strapi's Blocks field has no table node. Use `--format markdown`, or `bodyMode: dynamic-zone`, to keep them.",
-  table: 'The body contains a table. Blocks has no table node, so it cannot survive as a table in that field.',
   'list-item-flattened': 'Nested list items were flattened to a single level.',
   gallery: 'A gallery became consecutive images — Blocks has no gallery node. A dynamic zone keeps it as one component.',
   embed: 'An embed (YouTube, Vimeo, X …) became a plain link. A dynamic zone keeps it as `sections.embed`.',

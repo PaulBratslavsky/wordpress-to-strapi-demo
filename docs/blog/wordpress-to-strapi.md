@@ -700,6 +700,11 @@ repeatable component. And use /blog/{slug} for posts.
 Tell Claude to continue. It generates the Strapi types, waits for Strapi to reload, runs the
 migration and then the verify step.
 
+If the wait for that reload never ends, check where your project lives. `strapi develop` ignores
+any path matching `/tmp/`, so a project under `/private/tmp/...` is watched by nothing and the
+schema never appears. Nothing is logged. Move the project, or restart Strapi yourself after
+generating.
+
 Before it writes anything it runs a preflight, which stops the run rather than half-finishing
 it. It catches relations pointing at types nobody defined, dynamic zones naming components that
 do not exist, unknown transforms, content types Strapi is not serving yet (usually generate ran
@@ -736,7 +741,10 @@ migrated, verified clean. This is `verify.js` from the run that tested this post
 ```
 
 19 warnings, 0 failures. The project entries carry the ACF fields the REST API had hidden:
-client, year, launch date, hero image, results, and both linked services.
+`clientName`, `year`, `launchDate`, `heroImage`, a `results` component, and a relation to the
+services each project used. Not every project has every field, because not every project has them
+in WordPress either: two have no hero image, two have no results, and one has no launch date. The
+migration copies what is there rather than inventing the rest.
 
 Neuros: 13 content types, 343 entries and terms, 204 media files, 0 failures, 156 warnings.
 Every count matches the export. Its pages, services and case studies went into dynamic zones and
@@ -765,6 +773,9 @@ names the post, so you can decide whether that one is worth `--format markdown` 
 zone. Four entries on the demo site hit this.
 - **Embeds, as embeds.** An iframe or a video player becomes a link. The link keeps the embed's
   own description: its title, else its caption, else the provider name, else the file name.
+- **Files nothing points at.** Media is migrated because an entry references it, not by copying
+  the library, so an image attached to nothing stays behind. The demo has two: 30 records in
+  WordPress, 28 files in Strapi. Expect your library counts to differ for that reason.
 - **Comments.** Counted and reported, not migrated. Strapi has no built-in comments. Use a
   plugin, or add a `comment` collection with a relation to the entry.
 - **Menu nesting, as nesting.** Menus do migrate, into a `navigation` single type. A Strapi

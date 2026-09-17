@@ -79,6 +79,13 @@ async function main() {
   // Refuse to start on a config that can't work, or a Strapi that hasn't loaded
   // the generated schemas yet. Half a migration is worse than none.
   const problems = dryRun ? checkConfig(config) : await preflight(config, strapi);
+  if (!problems.length) {
+    console.log(
+      dryRun
+        ? 'Preflight: config checks passed (dry run, so Strapi was not contacted).'
+        : `Preflight: config and Strapi checks passed (${Object.keys(config.types ?? {}).length} types served, token can write).`
+    );
+  }
   if (problems.length) {
     console.error('\nPreflight found problems:\n');
     for (const p of problems) console.error(`  ✗ ${p}`);

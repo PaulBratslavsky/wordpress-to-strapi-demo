@@ -158,7 +158,10 @@ node generate.js --out ../my-strapi           # --force to overwrite existing ty
 ```
 
 Writes content types and any components the config needs. `strapi develop` reloads by
-itself — don't restart the user's server; wait for the reload and poll `/api/<plural>`.
+itself, so don't restart the user's server: wait for the reload and poll `/api/<plural>`. One
+exception, and it is silent: the watcher ignores any path matching `/tmp/`, so a project under
+`/private/tmp/...` never reloads and polling waits forever. If `/api/<plural>` still 404s a minute
+after generating, check the project path before blaming the schema.
 
 ### 6. Migrate
 
