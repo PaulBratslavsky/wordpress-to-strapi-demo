@@ -58,8 +58,14 @@ export async function convertContent(html, { format = 'blocks', media, links, sh
   }
 
   const markdown = toMarkdown(body);
-  if (format === 'markdown') return { value: markdown || null, warnings };
+  if (format === 'markdown') {
+    if (!markdown && String(html).trim()) warn('content-emptied', `${String(html).trim().length} characters of markup produced no text`);
+    return { value: markdown || null, warnings };
+  }
 
   const blocks = markdownToBlocks(markdown, { resolveImage: (u) => filesByUrl.get(u), warn });
+  if (!blocks.length && String(html).trim()) {
+    warn('content-emptied', `${String(html).trim().length} characters of markup produced no blocks`);
+  }
   return { value: blocks.length ? blocks : null, warnings };
 }
