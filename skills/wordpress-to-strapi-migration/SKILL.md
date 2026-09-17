@@ -38,7 +38,7 @@ Each step writes a file the next one reads, so you can stop, inspect and re-run 
 ```
 templates/
 ├── migrate/                     # the engine — run these
-│   ├── export.js                # WordPress REST API → wp-export/export.json
+│   ├── export.js                # WordPress REST API → wp-export/ (manifest + per-type NDJSON)
 │   ├── analyze.js               # export → migration plan + migration.config.json
 │   ├── generate.js              # config → Strapi content types and components
 │   ├── migrate.js               # export + config → Strapi (entries, media, relations)
@@ -96,9 +96,16 @@ Get the Strapi token from the admin panel (Settings → API Tokens → Full acce
 
 ```bash
 node export.js                 # add --download-media to keep a local copy of every file
+node export.js --fresh         # re-export post types already on disk instead of resuming
 ```
 
-Snapshots every post type, taxonomy, author and media record into `wp-export/export.json`.
+Snapshots every post type, taxonomy, author and media record into `wp-export/`: one
+`entries/<post type>.ndjson` per type, one entry per line, plus `export.json` with the site,
+types, taxonomies, terms, users, media and menus. Nothing is ever a single multi-gigabyte JSON
+string, which is what one combined file becomes on a large site (Node cannot hold a string past
+~512 MB). Each type's file is written as soon as it is fetched, so an interrupted export resumes;
+`--fresh` re-fetches types that are already there. An older single-file `export.json` still
+loads.
 It reports whether the helper plugin is active and which hidden types it exposed. If it says
 no custom fields were found and the site uses a commercial theme, install the helper and
 export again.

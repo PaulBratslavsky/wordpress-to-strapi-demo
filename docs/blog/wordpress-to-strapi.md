@@ -822,15 +822,21 @@ a production cutover with a rollback plan, you want purpose-built tooling and a 
 
 ### What breaks at 100,000 entries
 
-The largest site we have run this against held 343 entries and 204 files. The engine is built for
-that scale: the export writes one `export.json`, and the analyze and migrate steps read the whole
-file into memory. On a site with 100,000 posts that file is gigabytes, and Node refuses to parse a
-string that big. That is a wall, not a slow run, and no flag gets around it.
+The largest site we have run this against held 343 entries and 204 files. Until recently the
+export wrote everything into one `export.json`, and the analyze and migrate steps parsed that
+whole file. On a site with 100,000 posts the file passes what Node can hold in a single string,
+536,870,888 characters on the version we tested, and the run stops before any decision is made.
 
-Three other limits arrive behind it. The export is one long pass with no checkpoint, so a failure
-at 90 per cent means starting again. Entries migrate four at a time, each costing an API call to
-look up and another to write, which is hours of wall clock. And relations are wired by listing
-every existing entry of the target type, 100 per request, held in one map.
+The export now writes one file per post type, `wp-export/entries/<type>.ndjson`, with one entry
+per line, plus a small `export.json` holding the site, types, taxonomies, terms, users and media.
+Nothing is ever one giant string, and because each type's file is complete the moment it is
+written, an interrupted export resumes instead of starting again. Only `--fresh` re-fetches what
+is already on disk.
+
+Three limits are still real at that size. A whole-site run holds every entry in memory, so 100,000
+posts is bounded by RAM rather than by a parse error. Entries migrate four at a time, each costing
+an API call to look up and another to write, which is hours of wall clock. And relations are wired
+by listing every existing entry of the target type, 100 per request, held in one map.
 
 **What to do instead.** Use the skill for the part it is good at, which is deciding the content
 model, then move the bulk another way:

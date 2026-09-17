@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { WordPressClient, SKIP_TYPES, SKIP_TAXONOMIES, EXCLUDED_BY_DEFAULT, restRoute } from './lib/wordpress.js';
 import { parseArgs, requireEnv } from './lib/util.js';
+import { writeEntries, writeExport, exportProgress } from './lib/exportfile.js';
 
 /**
  * EXPORT — snapshot a WordPress site into wp-export/export.json via the REST
@@ -15,6 +16,11 @@ import { parseArgs, requireEnv } from './lib/util.js';
  *                   types skipped by default, like WooCommerce `product`)
  * --download-media  also save every media file to <out>/media/ so migrate.js
  *                   uploads from disk instead of fetching from WordPress
+ * --fresh           re-export post types already on disk instead of resuming
+ *
+ * Entries are written one type at a time to <out>/entries/<type>.ndjson, so a
+ * run that is interrupted resumes where it stopped, and no step has to parse a
+ * single multi-gigabyte JSON string.
  */
 
 const STATUSES = ['publish', 'future', 'draft', 'pending', 'private'];
@@ -33,7 +39,7 @@ async function fetchCollection(wp, route, params, label) {
 }
 
 async function main() {
-  const args = parseArgs(process.argv, ['download-media']);
+  const args = parseArgs(process.argv, ['download-media', 'fresh']);
   const out = args.out || 'wp-export';
   const wp = new WordPressClient({
     baseUrl: requireEnv('WP_URL'),
@@ -88,20 +94,30 @@ async function main() {
   );
 
   console.log('\nContent');
+  const done = args.fresh ? {} : exportProgress(out);
   const entries = {};
   for (const [slug, t] of Object.entries(types)) {
+    if (slug in done) {
+      console.log(`  ${t.name} (${slug}): ${done[slug]} already exported, skipping (--fresh to redo)`);
+      entries[slug] = null; // already on disk; writeExport keeps it
+      continue;
+    }
     const params = { context, orderby: 'id', order: 'asc', ...(wp.authenticated ? { status: STATUSES } : {}) };
+    let items;
     try {
-      entries[slug] = (await fetchCollection(wp, restRoute(t), params, `${t.name} (${slug})`)).map(strip);
+      items = (await fetchCollection(wp, restRoute(t), params, `${t.name} (${slug})`)).map(strip);
     } catch (err) {
       // Some custom REST controllers reject status/orderby/context=edit — retry with defaults.
       try {
-        entries[slug] = (await fetchCollection(wp, restRoute(t), { context: 'view' }, `${t.name} (${slug}, published only)`)).map(strip);
+        items = (await fetchCollection(wp, restRoute(t), { context: 'view' }, `${t.name} (${slug}, published only)`)).map(strip);
       } catch (err2) {
         console.warn(`  ! ${slug}: ${err2.message}`);
-        entries[slug] = [];
+        items = [];
       }
     }
+    // Written now, so an interrupted run resumes instead of starting again.
+    writeEntries(out, slug, items);
+    entries[slug] = items;
   }
 
   console.log('\nTaxonomies');
@@ -188,13 +204,13 @@ async function main() {
     menus,
     stats: { comments, skippedTypes: skipped },
   };
-  const file = path.join(out, 'export.json');
-  writeFileSync(file, JSON.stringify(snapshot, null, 2));
+  const file = writeExport(out, snapshot);
+  const counts = exportProgress(out);
 
-  console.log(`\nWrote ${file}`);
+  console.log(`\nWrote ${file} and ${path.join(out, 'entries')}/*.ndjson`);
   console.table(
     Object.fromEntries([
-      ...Object.entries(entries).map(([k, v]) => [k, { kind: 'post type', count: v.length }]),
+      ...Object.entries(counts).map(([k, n]) => [k, { kind: 'post type', count: n }]),
       ...Object.entries(terms).map(([k, v]) => [k, { kind: 'taxonomy', count: v.length }]),
       ['users', { kind: 'people', count: users.length }],
       ['media', { kind: 'files', count: media.length }],

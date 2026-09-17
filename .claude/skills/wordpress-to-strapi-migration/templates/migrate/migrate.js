@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { loadJson, parseArgs, requireEnv, slugify, htmlToText, getPath, asArray } from './lib/util.js';
+import { loadExport } from './lib/exportfile.js';
 import { checkConfig, preflight } from './lib/preflight.js';
 import { buildNavigation } from './lib/navigation.js';
 import { summaryMarkdown } from './lib/summary.js';
@@ -36,7 +37,7 @@ async function main() {
   const configPath = args.config || 'migration.config.json';
   const config = loadJson(configPath);
   const exportPath = args.export || config.source?.export || 'wp-export/export.json';
-  const data = loadJson(exportPath);
+  const data = loadExport(exportPath);
   const exportDir = path.dirname(exportPath);
   const dryRun = Boolean(args['dry-run']);
   const only = args.only ? new Set(args.only.split(',').map((s) => s.trim())) : null;

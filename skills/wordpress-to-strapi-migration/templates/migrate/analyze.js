@@ -1,5 +1,6 @@
 import { writeFileSync } from 'node:fs';
 import { loadJson, parseArgs, kebab, camel, pluralize, slugify, htmlToText, routeFor } from './lib/util.js';
+import { loadExport } from './lib/exportfile.js';
 import { detectPageBuilder } from './lib/html.js';
 import { MediaLibrary } from './lib/media.js';
 import { planMarkdown } from './lib/plan.js';
@@ -176,7 +177,7 @@ function main() {
   const exportPath = args.export || 'wp-export/export.json';
   const outPath = args.out || 'migration.config.json';
   const format = args.format || 'blocks';
-  const data = loadJson(exportPath);
+  const data = loadExport(exportPath);
   const site = data.site;
   const richType = format === 'markdown' ? 'richtext' : 'blocks';
 

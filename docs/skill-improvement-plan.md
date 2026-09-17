@@ -125,7 +125,7 @@ creating one entry per value, and rewriting the field as a `manyToMany` relation
 *Evidence:* Northfield's `team.specialties` and Neuros's `team_member_responsibilities_list`
 both migrate as repeatable components today, and both read like vocabularies.
 
-### 1.6 Stream the export so large sites are possible — **open**
+### 1.6 Split the export so large sites are possible — **done** (the parse ceiling), **open** (streaming)
 
 The export writes one `wp-export/export.json`, and both `analyze.js` and `migrate.js` read it
 with `loadJson` (`lib/util.js:62`), which is `JSON.parse(readFileSync(...))`. Every entry, every
@@ -143,10 +143,19 @@ Three limits sit behind it, all worth fixing in the same pass:
 - **The report grows with the run.** Warnings and failures accumulate in memory before
   `migration-report.json` is written.
 
-Shape of the fix: write one file per post type as newline-delimited JSON plus a small manifest
-(counts, taxonomies, users, media index), then have the analyzer accumulate its field evidence
-per line and the migration read entries as a stream. Keep `export.json` working so existing runs
-and fixtures do not break.
+**Done.** The export writes `wp-export/entries/<type>.ndjson`, one entry per line, plus a
+manifest (`lib/exportfile.js`). Nothing is parsed as one string: Node's limit on this machine is
+536,870,888 characters. Each type's file is written as it is fetched, so an interrupted run
+resumes and `--fresh` forces a re-fetch. `loadExport` rebuilds the same in-memory shape, takes an
+`only` list so a narrowed run skips types it will not touch, and still reads an older single-file
+`export.json`. Verified against the live demo site: the split and legacy formats produce byte-for-byte
+identical `migration.config.json` apart from the recorded export path, a re-fetched type file is
+byte-identical, and `migrate.js --dry-run` reports the same warnings.
+
+**Still open.** A whole-site run holds every entry in memory, so 100k entries is now bounded by
+RAM rather than by a parse error. Closing that means accumulator-based analysis over a stream,
+streaming migration, and relation lookups by query instead of one `Map` per target type
+(`migrate.js:325`). The report also grows in memory before it is written.
 
 *Evidence:* the largest run so far is Neuros at 343 entries and 204 files, where `export.json` is
 a few MB. The ceiling is arithmetic, not a measurement: one WordPress post with its body and meta
