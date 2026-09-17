@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import { loadJson, parseArgs, requireEnv, getPath } from './lib/util.js';
 import { loadExport } from './lib/exportfile.js';
+import { loadConfig } from './lib/config.js';
 import { StrapiClient } from './lib/strapi.js';
 import { itemsOf } from './lib/source.js';
 
@@ -59,7 +60,7 @@ function populateFor(type) {
 
 async function main() {
   const args = parseArgs(process.argv);
-  const config = loadJson(args.config || 'migration.config.json');
+  const config = loadConfig(args.config || 'migration.config.json');
   const data = loadExport(args.export || config.source?.export || 'wp-export/export.json');
   const strapi = new StrapiClient({ baseUrl: process.env.STRAPI_URL || 'http://localhost:1337', token: requireEnv('STRAPI_API_TOKEN') });
   const oldHost = new URL(data.site.home).host;

@@ -435,7 +435,7 @@ function main() {
       flag(
         t.bodyMode === 'dynamic-zone'
           ? `${t.singularName}: ${builder}/${items.length} entries built with a page builder → their sections become a dynamic zone`
-          : `${t.singularName}: ${builder}/${items.length} entries built with a page builder — layout is flattened to rich text (see references/page-builders.md)`
+          : `${t.singularName}: ${builder}/${items.length} entries built with a page builder — too few to assume, so the layout flattens to rich text. Set "bodyMode": "dynamic-zone" on ${t.singularName} in migration.config.json to keep the sections instead (see references/page-builders.md)`
       );
     }
     const embeds = count((e) => /wp-block-embed|<iframe/i.test(html(e)));

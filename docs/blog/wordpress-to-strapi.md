@@ -543,7 +543,7 @@ address bar after you click **Open site**. The rest of this post uses `http://no
 wherever you see it, use your own address instead.
 
 That is Northfield Studio: a fictional design agency with 8 pages, 9 posts, 5 services, 4 team
-members, 4 testimonials, 6 projects, 30 images and 26 terms. It has the hard parts on purpose.
+members, 4 testimonials, 6 projects, 30 images and 28 terms. It has the hard parts on purpose.
 A post type hidden from the API. ACF fields hidden from the API. A classic-editor post full of
 shortcodes. A draft with no slug. A scheduled post. Links to a domain that no longer exists.
 
@@ -713,21 +713,26 @@ already know what it implies. Read the summary, then go and look at what it name
 
 ## What the two runs produced
 
-Northfield: 12 content types, every entry migrated, verified clean.
+Northfield: 13 content types (12 collections plus the `navigation` single type), every entry
+migrated, verified clean. This is `verify.js` from the run that tested this post:
 
 ```
-┌────────────────┬───────────┬────────┬─────────────┬──────────────┬─────┐
-│ (index)        │ wordpress │ strapi │ oldHostRefs │ missingMedia │ ok  │
-├────────────────┼───────────┼────────┼─────────────┼──────────────┼─────┤
-│ post           │ 9         │ 9      │ 0           │ 0            │ '✓' │
-│ page           │ 8         │ 8      │ 0           │ 0            │ '✓' │
-│ service        │ 5         │ 5      │ 0           │ 0            │ '✓' │
-│ team           │ 4         │ 4      │ 0           │ 0            │ '✓' │
-│ testimonial    │ 4         │ 4      │ 0           │ 0            │ '✓' │
-│ portfolio-item │ 6         │ 6      │ 0           │ 0            │ '✓' │
-│ author         │ 4         │ 4      │ 0           │ 0            │ '✓' │
-│ category       │ 7         │ 7      │ 0           │ 0            │ '✓' │
-└────────────────┴───────────┴────────┴─────────────┴──────────────┴─────┘
+┌────────────────┬───────────┬────────┬─────────────┬────────────┬──────────────┬─────┐
+│ (index)        │ wordpress │ strapi │ oldHostRefs │ inCaptions │ missingMedia │ ok  │
+├────────────────┼───────────┼────────┼─────────────┼────────────┼──────────────┼─────┤
+│ author         │ 4         │ 4      │ 0           │ 0          │ 0            │ '✓' │
+│ category       │ 7         │ 7      │ 0           │ 0          │ 0            │ '✓' │
+│ tag            │ 8         │ 8      │ 0           │ 0          │ 0            │ '✓' │
+│ industry       │ 5         │ 5      │ 0           │ 0          │ 0            │ '✓' │
+│ department     │ 3         │ 3      │ 0           │ 0          │ 0            │ '✓' │
+│ portfolio      │ 5         │ 5      │ 0           │ 0          │ 0            │ '✓' │
+│ post           │ 9         │ 9      │ 0           │ 0          │ 0            │ '✓' │
+│ page           │ 8         │ 8      │ 0           │ 0          │ 0            │ '✓' │
+│ service        │ 5         │ 5      │ 0           │ 0          │ 0            │ '✓' │
+│ team           │ 4         │ 4      │ 0           │ 0          │ 0            │ '✓' │
+│ testimonial    │ 4         │ 4      │ 0           │ 0          │ 0            │ '✓' │
+│ portfolio-item │ 6         │ 6      │ 0           │ 0          │ 0            │ '✓' │
+└────────────────┴───────────┴────────┴─────────────┴────────────┴──────────────┴─────┘
 ```
 
 19 warnings, 0 failures. The project entries carry the ACF fields the REST API had hidden:
@@ -798,7 +803,9 @@ JSON-escaped form (`https:\/\/...`) that page builders store.
 A few things change once the site is real.
 
 **Do a dry run first.** `--dry-run` converts everything and writes each entry's payload to disk
-without touching Strapi. On a large site that is the cheapest hour you will spend.
+without touching Strapi. On a large site that is the cheapest hour you will spend. It cannot tell
+you about uploads, though: warnings like `image-failed` only appear once files are really being
+sent, so expect a few more warnings in the real run than in the preview.
 
 **Migrate in slices.** `--only post,page` and `--limit 20` while you are still deciding what the
 content should look like.

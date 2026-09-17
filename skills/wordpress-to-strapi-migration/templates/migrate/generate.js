@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { loadJson, parseArgs, kebab, routeFor } from './lib/util.js';
 import { SECTION_COMPONENTS, NAVIGATION_COMPONENTS } from './lib/components.js';
+import { loadConfig } from './lib/config.js';
 
 /**
  * GENERATE — write Strapi v5 content types (and components) from
@@ -194,7 +195,10 @@ function main() {
     console.error(`${a.out} doesn't look like a Strapi project (no @strapi/strapi in package.json).`);
     process.exit(1);
   }
-  const config = loadJson(a.config || 'migration.config.json');
+  const config = loadConfig(a.config || 'migration.config.json', {
+    onChange: (t, c) => console.log(`  ~ ${t.singularName}.${c.field}: ${c.from} → ${c.to}  (bodyMode: ${t.bodyMode})`),
+  });
+
   const errors = validate(config);
   if (errors.length) {
     console.error('Config problems — fix migration.config.json first:\n  ' + errors.join('\n  '));

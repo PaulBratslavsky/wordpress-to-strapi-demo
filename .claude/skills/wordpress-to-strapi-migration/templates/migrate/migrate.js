@@ -3,6 +3,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { loadJson, parseArgs, requireEnv, slugify, htmlToText, getPath, asArray } from './lib/util.js';
 import { loadExport } from './lib/exportfile.js';
+import { loadConfig } from './lib/config.js';
 import { checkConfig, preflight } from './lib/preflight.js';
 import { buildNavigation } from './lib/navigation.js';
 import { summaryMarkdown } from './lib/summary.js';
@@ -35,7 +36,7 @@ import { itemsOf } from './lib/source.js';
 async function main() {
   const args = parseArgs(process.argv, ['dry-run']);
   const configPath = args.config || 'migration.config.json';
-  const config = loadJson(configPath);
+  const config = loadConfig(configPath);
   const exportPath = args.export || config.source?.export || 'wp-export/export.json';
   const data = loadExport(exportPath);
   const exportDir = path.dirname(exportPath);

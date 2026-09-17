@@ -29,7 +29,9 @@ const EXPLANATIONS = {
   'elementor-unreadable': "Elementor's stored JSON could not be parsed, so the rendered HTML was used instead.",
   'media-missing': 'A media reference had no matching file in the export.',
   'image-missing': 'An image referenced in the body was not found in the media library.',
-  'image-failed': 'An image could not be uploaded to Strapi. See the files section above.',
+  'image-failed':
+    'An image could not be uploaded to Strapi. The entry migrated without it; the reason is on ' +
+    'the warning line, and any file Strapi refused outright is listed under "Files that could not be migrated".',
   'image-not-embedded': 'An image could not be embedded in Blocks and was left as a link.',
   'file-link-missing': 'A link pointing at an uploaded file could not be resolved.',
   'section-image-dropped': 'An image was dropped from a component because it could not be uploaded, rather than leaving a WordPress URL behind.',

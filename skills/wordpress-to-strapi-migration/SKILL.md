@@ -89,8 +89,16 @@ npm install
 cp .env.example .env     # WP_URL, WP_USER, WP_APP_PASSWORD, STRAPI_URL, STRAPI_API_TOKEN
 ```
 
-Get the Strapi token from the admin panel (Settings → API Tokens → Full access), or run
-`node <strapi>/scripts/create-api-token.mjs`.
+Strapi 5 creates a **Full Access** token on first boot: Settings → API Tokens → Full Access →
+View token → Copy. To mint one headlessly instead, copy the script into the project first (it is
+not there by default) and give it the admin credentials:
+
+```bash
+mkdir -p <strapi>/scripts
+cp templates/strapi/scripts/create-api-token.mjs <strapi>/scripts/
+STRAPI_URL=http://localhost:1337 ADMIN_EMAIL=you@example.com ADMIN_PASSWORD='<password>' \
+  node <strapi>/scripts/create-api-token.mjs
+```
 
 ### 2. Export
 

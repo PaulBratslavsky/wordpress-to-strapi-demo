@@ -75,7 +75,7 @@ The migration reads WordPress through its REST API. The Local site zip already i
 | Projects | 6 | WPZOOM Portfolio + ACF |
 | Team members | 4 | Custom Post Type UI + ACF |
 | Testimonials | 4 | Custom Post Type UI + ACF (not public) |
-| Categories, tags, portfolio types, industries, departments | 26 terms | Core, WPZOOM Portfolio, Custom Post Type UI |
+| Categories, tags, portfolio types, industries, departments | 28 terms | Core, WPZOOM Portfolio, Custom Post Type UI |
 | Images | 30 | Media library, with alt text |
 | Authors, menus, comments | 3, 2, 5 | Core |
 
