@@ -125,6 +125,33 @@ creating one entry per value, and rewriting the field as a `manyToMany` relation
 *Evidence:* Northfield's `team.specialties` and Neuros's `team_member_responsibilities_list`
 both migrate as repeatable components today, and both read like vocabularies.
 
+### 1.6 Stream the export so large sites are possible — **open**
+
+The export writes one `wp-export/export.json`, and both `analyze.js` and `migrate.js` read it
+with `loadJson` (`lib/util.js:62`), which is `JSON.parse(readFileSync(...))`. Every entry, every
+meta value and every Elementor layout sits in one string and one object graph. On a site with
+100,000 posts that file is gigabytes, and Node will not parse a string that large, so the run
+fails before any decision is made. No flag helps: `--only` and `--limit` narrow what is
+*migrated*, not what is parsed.
+
+Three limits sit behind it, all worth fixing in the same pass:
+
+- **No checkpoint in the export.** `export.js` collects everything in memory and writes once at
+  the end (`export.js:192`), so a failure at 90 per cent starts over.
+- **Relation maps are loaded whole.** `idMapFor` (`migrate.js:325`) lists every existing entry of
+  a target type, 100 per request, and holds the `wpId` → `documentId` pairs in one `Map`.
+- **The report grows with the run.** Warnings and failures accumulate in memory before
+  `migration-report.json` is written.
+
+Shape of the fix: write one file per post type as newline-delimited JSON plus a small manifest
+(counts, taxonomies, users, media index), then have the analyzer accumulate its field evidence
+per line and the migration read entries as a stream. Keep `export.json` working so existing runs
+and fixtures do not break.
+
+*Evidence:* the largest run so far is Neuros at 343 entries and 204 files, where `export.json` is
+a few MB. The ceiling is arithmetic, not a measurement: one WordPress post with its body and meta
+is tens of KB, so 100,000 of them is gigabytes in a single string.
+
 ### 1.4 Follow LaunchPad's reusable-section pattern — **done** (detect and flag)
 
 Strapi's reference project models list-style sections as a component holding a heading plus a

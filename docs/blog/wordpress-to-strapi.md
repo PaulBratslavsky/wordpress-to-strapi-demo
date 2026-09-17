@@ -316,7 +316,7 @@ It also reports what it did. Ask it directly, using the application password, be
 endpoint only answers logged-in users:
 
 ```
-curl -u admin:"xxxx xxxx xxxx xxxx xxxx xxxx" http://northfield.local/wp-json/strapi-migration/v1/info
+curl -u admin:"xxxx xxxx xxxx xxxx xxxx xxxx" http://your-site.local/wp-json/strapi-migration/v1/info
 
 {"version":"1.0.0","forced_post_types":["team"],"forced_taxonomies":["department"]}
 ```
@@ -532,10 +532,15 @@ Then:
 
 ![Local's Import site from archive screen, with northfield typed as the site name, the domain northfield.local filled in below it, and the Continue button highlighted.](images/011-local-setup-2.png)
 
-You should see: `northfield` in Local's site list with a green dot. Click **Open site** and
-`http://northfield.local` shows this:
+You should see: your site in Local's site list with a green dot. Click **Open site** and it shows
+this:
 
 ![The Northfield Studio home page: a dark navigation bar, the headline "Brand, web and product design for independent businesses", and a photograph of a studio desk.](images/wp-home.png)
+
+**Note your site's address.** Local builds it from the name you typed: `northfield` becomes
+`http://northfield.local`, and `my-demo` becomes `http://my-demo.local`. It is in your browser's
+address bar after you click **Open site**. The rest of this post uses `http://northfield.local`;
+wherever you see it, use your own address instead.
 
 That is Northfield Studio: a fictional design agency with 8 pages, 9 posts, 5 services, 4 team
 members, 4 testimonials, 6 projects, 30 images and 26 terms. It has the hard parts on purpose.
@@ -554,6 +559,8 @@ These are demo credentials for a site that only runs on your machine. Change the
 menu. Scroll past the banners at the top to the plugin list. You should see
 **Strapi Migration Helper** there with a **Deactivate** link under it, which means it is active.
 
+![WP Admin's Plugins page with Plugins highlighted in the left menu and Strapi Migration Helper highlighted in the list, showing a Deactivate link and its description.](images/011-local-setup-3.png)
+
 This is the plugin that makes the hidden post types and custom fields readable, as described
 earlier. The demo site comes with it installed. On your own site you install it yourself, the
 normal way:
@@ -568,8 +575,11 @@ site, including drafts and custom fields.
 
 1. In WP Admin, go to **Users, Profile**.
 2. Scroll down to **Application Passwords**.
-3. Type `strapi-migration` as the name and click **Add New Application Password**.
+3. Type a name such as `strapi-migration` and click **Add Application Password**.
 4. Copy the password it shows. WordPress will not show it again.
+
+![The Application Passwords section of a WordPress user profile, with Users, Profile highlighted in the left menu, a name typed into the New Application Password Name field, and the Add Application Password button below it.](images/011-local-setup-4.png)
+
 
 You will give it to Claude in section 3.
 
@@ -579,8 +589,15 @@ You will give it to Claude in section 3.
 npx skills add PaulBratslavsky/wordpress-to-strapi-demo -g --agent claude-code --yes
 ```
 
-You should see: `✓ wordpress-to-strapi-migration (copied)` and
-`→ ~/.claude/skills/wordpress-to-strapi-migration`.
+You should see: 
+``` bash
+◇  Installed 1 skill ──────────────────────────────────╮
+│                                                      │
+│  ✓ wordpress-to-strapi-migration (copied)            │
+│    → ~/.claude/skills/wordpress-to-strapi-migration  │
+│                                                      │
+├──────────────────────────────────────────────────────╯
+```
 
 This copies only the skill folder into `~/.claude/skills/`, where Claude Code finds it from any
 project. You do not need the rest of this repo. It needs Node.js 20 or newer, which Strapi needs
@@ -598,27 +615,47 @@ anyway.
 ### 2. Create a Strapi project
 
 ```bash
-npx create-strapi-app@latest my-strapi --no-run --skip-cloud --typescript \
-  --dbclient sqlite --dbfile .tmp/data.db
+npx create-strapi-app@latest my-strapi --non-interactive --no-run --skip-cloud \
+  --typescript --dbclient sqlite --dbfile .tmp/data.db --use-npm --no-git-init
 ```
+
+`--non-interactive` stops the installer asking questions. It installs the dependencies and leaves
+out the example content, and the last two flags pick npm and skip creating a git repository.
 
 Pass `--dbfile`. Without it Strapi writes an empty `DATABASE_FILENAME=` into `.env`, then tries
 to open the project folder as a database and stops with
 `SqliteError: unable to open database file`.
 
-Start it with `npm run develop`, create your admin user, then go to Settings, API Tokens, Create
-new API Token and choose Full access. Keep that token.
+Start it with `npm run develop`. If port 1337 is already in use, pick another one with
+`PORT=1340 npm run develop`, and use that port everywhere below.
+
+Strapi opens in your browser and asks you to create the first admin user. That account is local
+to this project:
+
+![Strapi's Welcome to Strapi screen, with First name, Last name, Email, Password and Confirm Password fields and a Let's start button.](images/011-local-setup-5.png)
+
+Now get the token the migration writes with. Go to **Settings, API Tokens**. Strapi creates two
+tokens for you, so there is nothing to add: open the one called **Full Access**.
+
+![Strapi's API Tokens settings page listing two tokens, Full Access and Read Only, with Full Access highlighted.](images/011-local-setup-6.png)
+
+Click **View token**, then **Copy**. Strapi shows it only while you are on this page; if you lose
+it, click **Regenerate** for a new one.
+
+![The Full Access token page in Strapi, with the View token button highlighted and the token area below it, here blacked out.](images/011-local-setup-7.png)
+
+Keep that token for section 3.
 
 ### 3. Open Claude Code and ask
 
 In a terminal, go to the folder that contains `my-strapi` and run `claude`. The skill you
 installed in step 7 is already available.
 
-Then describe your situation, pasting the application password from section 1 and the API token
-from section 2:
+Then describe your situation. Replace the site address with your own from step 3, the password
+with the application password from step 6, and the token with the one from section 2:
 
 ```
-Migrate my WordPress site at http://northfield.local into the Strapi project
+Migrate my WordPress site at `local-wp-project-url` into the Strapi project
 at ./my-strapi, running on http://localhost:1337. My WordPress user is admin and
 the application password is xxxx xxxx xxxx xxxx xxxx xxxx. The Strapi API token
 is <your token>. Start with a dry run.
@@ -782,6 +819,46 @@ landing pages" is one sentence.
 
 **Know when this is the wrong tool.** If you are moving tens of thousands of entries, or you need
 a production cutover with a rollback plan, you want purpose-built tooling and a staging rehearsal.
+
+### What breaks at 100,000 entries
+
+The largest site we have run this against held 343 entries and 204 files. The engine is built for
+that scale: the export writes one `export.json`, and the analyze and migrate steps read the whole
+file into memory. On a site with 100,000 posts that file is gigabytes, and Node refuses to parse a
+string that big. That is a wall, not a slow run, and no flag gets around it.
+
+Three other limits arrive behind it. The export is one long pass with no checkpoint, so a failure
+at 90 per cent means starting again. Entries migrate four at a time, each costing an API call to
+look up and another to write, which is hours of wall clock. And relations are wired by listing
+every existing entry of the target type, 100 per request, held in one map.
+
+**What to do instead.** Use the skill for the part it is good at, which is deciding the content
+model, then move the bulk another way:
+
+- **Rehearse on a slice.** `--only post --limit 500` on a copy gives you a content model, a
+  `migration-plan.md` and a list of what does not convert cleanly. That is the expensive thinking,
+  and it is the same at any size.
+- **Read WordPress from the database, not the REST API.** WP-CLI will page through content without
+  HTTP overhead or authentication: `wp post list --post_type=post --format=json --fields=ID,post_title,post_name,post_date,post_status`.
+  Write one file per type, or per month, so nothing has to be parsed whole.
+- **Write into Strapi from inside Strapi.** The
+  [Document Service API](https://docs.strapi.io/cms/api/document-service) runs in the application
+  rather than over HTTP: `await strapi.documents('api::post.post').create({ data })`. There is no
+  bulk create, so you still loop, but you drop the per-request cost and the token. Run it from a
+  script the project loads, and use Postgres rather than the tutorial's SQLite.
+- **Keep every batch repeatable.** Match entries on their WordPress id and source site, the way
+  the engine does, so a rerun updates instead of duplicating and you can stop and resume per type
+  or per date range.
+- **Move the files separately.** Media is the slow half. Copy the uploads directory and register
+  the files, or point Strapi at the same S3 bucket, instead of downloading and re-uploading each
+  one through the API.
+- **Plan the cutover as two passes.** Migrate the archive while the old site keeps publishing,
+  then catch up on what changed with a date filter, which is what `--since` does here.
+
+One thing that sounds like a shortcut and is not: `strapi import` and `strapi transfer` only move
+data between Strapi projects whose content types are
+[identical](https://docs.strapi.io/cms/data-management/import). They are useful for pushing a
+finished dataset from a local run to production, and useless for reading WordPress.
 
 Everything here is in
 [github.com/PaulBratslavsky/wordpress-to-strapi-demo](https://github.com/PaulBratslavsky/wordpress-to-strapi-demo):

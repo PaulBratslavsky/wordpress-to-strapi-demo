@@ -72,7 +72,8 @@ references/
      folder named `strapi-migration-helper` and zip that folder.
    - With WP-CLI on the site: `wp plugin install strapi-migration-helper.zip --activate`.
 4. **A Strapi v5 project.** If there isn't one:
-   `npx create-strapi-app@latest my-strapi --no-run --skip-cloud --typescript --dbclient sqlite --dbfile .tmp/data.db`
+   `npx create-strapi-app@latest my-strapi --non-interactive --no-run --skip-cloud --typescript --dbclient sqlite --dbfile .tmp/data.db --use-npm --no-git-init`
+   (`--non-interactive` skips the installer's questions; run `npx create-strapi-app@latest --help` for the rest)
    Pass `--dbfile`: with an empty `DATABASE_FILENAME` Strapi tries to open the project
    directory as a database and dies with `SqliteError: unable to open database file`.
 5. **One Strapi per WordPress site.** Entries are matched on `wpId`, and two sites both
