@@ -14,7 +14,6 @@
 
 const EXPLANATIONS = {
   'table-flattened': "Tables became plain paragraphs — Strapi's Blocks field has no table node. Use `--format markdown`, or `bodyMode: dynamic-zone`, to keep them.",
-  table: 'The body contains a table. Blocks has no table node, so it cannot survive as a table in that field.',
   'list-item-flattened': 'Nested list items were flattened to a single level.',
   gallery: 'A gallery became consecutive images — Blocks has no gallery node. A dynamic zone keeps it as one component.',
   embed: 'An embed (YouTube, Vimeo, X …) became a plain link. A dynamic zone keeps it as `sections.embed`.',
@@ -29,7 +28,9 @@ const EXPLANATIONS = {
   'elementor-unreadable': "Elementor's stored JSON could not be parsed, so the rendered HTML was used instead.",
   'media-missing': 'A media reference had no matching file in the export.',
   'image-missing': 'An image referenced in the body was not found in the media library.',
-  'image-failed': 'An image could not be uploaded to Strapi. See the files section above.',
+  'image-failed':
+    'An image could not be uploaded to Strapi. The entry migrated without it; the reason is on ' +
+    'the warning line, and any file Strapi refused outright is listed under "Files that could not be migrated".',
   'image-not-embedded': 'An image could not be embedded in Blocks and was left as a link.',
   'file-link-missing': 'A link pointing at an uploaded file could not be resolved.',
   'section-image-dropped': 'An image was dropped from a component because it could not be uploaded, rather than leaving a WordPress URL behind.',

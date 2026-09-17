@@ -19,6 +19,22 @@ export class StrapiClient {
     this.token = token;
   }
 
+  /**
+   * Which HTTP methods Strapi's router accepts for a path. A route that exists
+   * offers a write verb (POST for a collection, PUT for a single type); one
+   * that does not exist offers only HEAD and GET. That is the only way to tell
+   * an empty single type from a type Strapi is not serving: both answer 404.
+   */
+  async allowedMethods(path) {
+    const res = await fetch(`${this.baseUrl}${path}`, {
+      method: 'OPTIONS',
+      headers: { Authorization: `Bearer ${this.token}` },
+    });
+    const allow = res.headers.get('allow');
+    if (!allow) throw new Error(`OPTIONS ${path} returned no Allow header`);
+    return allow.split(',').map((m) => m.trim().toUpperCase());
+  }
+
   async request(path, { method = 'GET', body, headers = {} } = {}) {
     const res = await fetch(`${this.baseUrl}${path}`, {
       method,

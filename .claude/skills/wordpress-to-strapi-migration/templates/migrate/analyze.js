@@ -1,5 +1,6 @@
 import { writeFileSync } from 'node:fs';
 import { loadJson, parseArgs, kebab, camel, pluralize, slugify, htmlToText, routeFor } from './lib/util.js';
+import { loadExport } from './lib/exportfile.js';
 import { detectPageBuilder } from './lib/html.js';
 import { MediaLibrary } from './lib/media.js';
 import { planMarkdown } from './lib/plan.js';
@@ -176,7 +177,7 @@ function main() {
   const exportPath = args.export || 'wp-export/export.json';
   const outPath = args.out || 'migration.config.json';
   const format = args.format || 'blocks';
-  const data = loadJson(exportPath);
+  const data = loadExport(exportPath);
   const site = data.site;
   const richType = format === 'markdown' ? 'richtext' : 'blocks';
 
@@ -434,7 +435,7 @@ function main() {
       flag(
         t.bodyMode === 'dynamic-zone'
           ? `${t.singularName}: ${builder}/${items.length} entries built with a page builder → their sections become a dynamic zone`
-          : `${t.singularName}: ${builder}/${items.length} entries built with a page builder — layout is flattened to rich text (see references/page-builders.md)`
+          : `${t.singularName}: ${builder}/${items.length} entries built with a page builder — too few to assume, so the layout flattens to rich text. Set "bodyMode": "dynamic-zone" on ${t.singularName} in migration.config.json to keep the sections instead (see references/page-builders.md)`
       );
     }
     const embeds = count((e) => /wp-block-embed|<iframe/i.test(html(e)));

@@ -38,7 +38,7 @@ Each step writes a file the next one reads, so you can stop, inspect and re-run 
 ```
 templates/
 ├── migrate/                     # the engine — run these
-│   ├── export.js                # WordPress REST API → wp-export/export.json
+│   ├── export.js                # WordPress REST API → wp-export/ (manifest + per-type NDJSON)
 │   ├── analyze.js               # export → migration plan + migration.config.json
 │   ├── generate.js              # config → Strapi content types and components
 │   ├── migrate.js               # export + config → Strapi (entries, media, relations)
@@ -72,7 +72,8 @@ references/
      folder named `strapi-migration-helper` and zip that folder.
    - With WP-CLI on the site: `wp plugin install strapi-migration-helper.zip --activate`.
 4. **A Strapi v5 project.** If there isn't one:
-   `npx create-strapi-app@latest my-strapi --no-run --skip-cloud --typescript --dbclient sqlite --dbfile .tmp/data.db`
+   `npx create-strapi-app@latest my-strapi --non-interactive --no-run --skip-cloud --typescript --dbclient sqlite --dbfile .tmp/data.db --use-npm --no-git-init`
+   (`--non-interactive` skips the installer's questions; run `npx create-strapi-app@latest --help` for the rest)
    Pass `--dbfile`: with an empty `DATABASE_FILENAME` Strapi tries to open the project
    directory as a database and dies with `SqliteError: unable to open database file`.
 5. **One Strapi per WordPress site.** Entries are matched on `wpId`, and two sites both
@@ -88,16 +89,31 @@ npm install
 cp .env.example .env     # WP_URL, WP_USER, WP_APP_PASSWORD, STRAPI_URL, STRAPI_API_TOKEN
 ```
 
-Get the Strapi token from the admin panel (Settings → API Tokens → Full access), or run
-`node <strapi>/scripts/create-api-token.mjs`.
+Strapi 5 creates a **Full Access** token on first boot: Settings → API Tokens → Full Access →
+View token → Copy. To mint one headlessly instead, copy the script into the project first (it is
+not there by default) and give it the admin credentials:
+
+```bash
+mkdir -p <strapi>/scripts
+cp templates/strapi/scripts/create-api-token.mjs <strapi>/scripts/
+STRAPI_URL=http://localhost:1337 ADMIN_EMAIL=you@example.com ADMIN_PASSWORD='<password>' \
+  node <strapi>/scripts/create-api-token.mjs
+```
 
 ### 2. Export
 
 ```bash
 node export.js                 # add --download-media to keep a local copy of every file
+node export.js --fresh         # re-export post types already on disk instead of resuming
 ```
 
-Snapshots every post type, taxonomy, author and media record into `wp-export/export.json`.
+Snapshots every post type, taxonomy, author and media record into `wp-export/`: one
+`entries/<post type>.ndjson` per type, one entry per line, plus `export.json` with the site,
+types, taxonomies, terms, users, media and menus. Nothing is ever a single multi-gigabyte JSON
+string, which is what one combined file becomes on a large site (Node cannot hold a string past
+~512 MB). Each type's file is written as soon as it is fetched, so an interrupted export resumes;
+`--fresh` re-fetches types that are already there. An older single-file `export.json` still
+loads.
 It reports whether the helper plugin is active and which hidden types it exposed. If it says
 no custom fields were found and the site uses a commercial theme, install the helper and
 export again.
@@ -142,7 +158,10 @@ node generate.js --out ../my-strapi           # --force to overwrite existing ty
 ```
 
 Writes content types and any components the config needs. `strapi develop` reloads by
-itself — don't restart the user's server; wait for the reload and poll `/api/<plural>`.
+itself, so don't restart the user's server: wait for the reload and poll `/api/<plural>`. One
+exception, and it is silent: the watcher ignores any path matching `/tmp/`, so a project under
+`/private/tmp/...` never reloads and polling waits forever. If `/api/<plural>` still 404s a minute
+after generating, check the project path before blaming the schema.
 
 ### 6. Migrate
 

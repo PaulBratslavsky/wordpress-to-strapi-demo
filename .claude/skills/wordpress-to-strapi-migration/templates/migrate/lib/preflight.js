@@ -92,20 +92,34 @@ export async function checkStrapi(config, probe) {
   const missing = [];
   for (const t of Object.values(config.types ?? {})) {
     const route = routeFor(t);
-    if ((await probe(route)) === 404) missing.push(route);
+    if ((await probe(route, t.kind)) === 404) missing.push(route);
   }
   return missing;
 }
 
 /** A `probe` backed by a real Strapi client. */
 export function probeWith(strapi) {
-  return async (pluralName) => {
+  return async (pluralName, kind) => {
     try {
       await strapi.request(`/api/${pluralName}?pagination[pageSize]=1`);
       return 200;
     } catch (err) {
-      if (err.status) return err.status;
-      throw new Error(`Strapi is not reachable at ${strapi.baseUrl} (${err.message})`);
+      if (err.status !== 404) {
+        if (err.status) return err.status;
+        throw new Error(`Strapi is not reachable at ${strapi.baseUrl} (${err.message})`);
+      }
+      // An empty single type answers 404 with the same body as a route that
+      // does not exist, and migrate.js is what creates the first navigation
+      // document, so a plain 404 check could never be satisfied. Ask the router
+      // instead: a real route offers a write verb.
+      try {
+        const allowed = await strapi.allowedMethods(`/api/${pluralName}`);
+        return allowed.includes('POST') || allowed.includes('PUT') ? 200 : 404;
+      } catch {
+        // No usable Allow header. Blocking a single type here would deadlock
+        // the first run, and a genuinely missing one fails clearly on write.
+        return kind === 'singleType' ? 200 : 404;
+      }
     }
   };
 }

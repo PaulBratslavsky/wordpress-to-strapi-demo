@@ -125,6 +125,42 @@ creating one entry per value, and rewriting the field as a `manyToMany` relation
 *Evidence:* Northfield's `team.specialties` and Neuros's `team_member_responsibilities_list`
 both migrate as repeatable components today, and both read like vocabularies.
 
+### 1.6 Split the export so large sites are possible — **done** (the parse ceiling), **open** (streaming)
+
+The export writes one `wp-export/export.json`, and both `analyze.js` and `migrate.js` read it
+with `loadJson` (`lib/util.js:62`), which is `JSON.parse(readFileSync(...))`. Every entry, every
+meta value and every Elementor layout sits in one string and one object graph. On a site with
+100,000 posts that file is gigabytes, and Node will not parse a string that large, so the run
+fails before any decision is made. No flag helps: `--only` and `--limit` narrow what is
+*migrated*, not what is parsed.
+
+Three limits sit behind it, all worth fixing in the same pass:
+
+- **No checkpoint in the export.** `export.js` collects everything in memory and writes once at
+  the end (`export.js:192`), so a failure at 90 per cent starts over.
+- **Relation maps are loaded whole.** `idMapFor` (`migrate.js:325`) lists every existing entry of
+  a target type, 100 per request, and holds the `wpId` → `documentId` pairs in one `Map`.
+- **The report grows with the run.** Warnings and failures accumulate in memory before
+  `migration-report.json` is written.
+
+**Done.** The export writes `wp-export/entries/<type>.ndjson`, one entry per line, plus a
+manifest (`lib/exportfile.js`). Nothing is parsed as one string: Node's limit on this machine is
+536,870,888 characters. Each type's file is written as it is fetched, so an interrupted run
+resumes and `--fresh` forces a re-fetch. `loadExport` rebuilds the same in-memory shape, takes an
+`only` list so a narrowed run skips types it will not touch, and still reads an older single-file
+`export.json`. Verified against the live demo site: the split and legacy formats produce byte-for-byte
+identical `migration.config.json` apart from the recorded export path, a re-fetched type file is
+byte-identical, and `migrate.js --dry-run` reports the same warnings.
+
+**Still open.** A whole-site run holds every entry in memory, so 100k entries is now bounded by
+RAM rather than by a parse error. Closing that means accumulator-based analysis over a stream,
+streaming migration, and relation lookups by query instead of one `Map` per target type
+(`migrate.js:325`). The report also grows in memory before it is written.
+
+*Evidence:* the largest run so far is Neuros at 343 entries and 204 files, where `export.json` is
+a few MB. The ceiling is arithmetic, not a measurement: one WordPress post with its body and meta
+is tens of KB, so 100,000 of them is gigabytes in a single string.
+
 ### 1.4 Follow LaunchPad's reusable-section pattern — **done** (detect and flag)
 
 Strapi's reference project models list-style sections as a component holding a heading plus a

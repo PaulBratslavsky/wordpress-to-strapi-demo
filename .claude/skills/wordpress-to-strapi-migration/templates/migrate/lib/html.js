@@ -138,9 +138,6 @@ export function parseWordPressHtml(html, { shortcodes = 'strip' } = {}) {
     pre.appendChild(code);
   }
 
-  const tables = $$('table').length;
-  if (tables) warn('table', `${tables} table(s)`);
-
   handleShortcodes(body, { mode: shortcodes, warn });
 
   return { document, body, warnings };

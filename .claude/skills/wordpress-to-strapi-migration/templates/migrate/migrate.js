@@ -2,6 +2,8 @@ import 'dotenv/config';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { loadJson, parseArgs, requireEnv, slugify, htmlToText, getPath, asArray } from './lib/util.js';
+import { loadExport } from './lib/exportfile.js';
+import { loadConfig } from './lib/config.js';
 import { checkConfig, preflight } from './lib/preflight.js';
 import { buildNavigation } from './lib/navigation.js';
 import { summaryMarkdown } from './lib/summary.js';
@@ -34,9 +36,9 @@ import { itemsOf } from './lib/source.js';
 async function main() {
   const args = parseArgs(process.argv, ['dry-run']);
   const configPath = args.config || 'migration.config.json';
-  const config = loadJson(configPath);
+  const config = loadConfig(configPath);
   const exportPath = args.export || config.source?.export || 'wp-export/export.json';
-  const data = loadJson(exportPath);
+  const data = loadExport(exportPath);
   const exportDir = path.dirname(exportPath);
   const dryRun = Boolean(args['dry-run']);
   const only = args.only ? new Set(args.only.split(',').map((s) => s.trim())) : null;
@@ -77,6 +79,13 @@ async function main() {
   // Refuse to start on a config that can't work, or a Strapi that hasn't loaded
   // the generated schemas yet. Half a migration is worse than none.
   const problems = dryRun ? checkConfig(config) : await preflight(config, strapi);
+  if (!problems.length) {
+    console.log(
+      dryRun
+        ? 'Preflight: config checks passed (dry run, so Strapi was not contacted).'
+        : `Preflight: config and Strapi checks passed (${Object.keys(config.types ?? {}).length} types served, token can write).`
+    );
+  }
   if (problems.length) {
     console.error('\nPreflight found problems:\n');
     for (const p of problems) console.error(`  ✗ ${p}`);
