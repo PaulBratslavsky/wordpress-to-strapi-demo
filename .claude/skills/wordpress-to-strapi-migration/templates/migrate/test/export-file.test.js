@@ -106,3 +106,15 @@ test('a type written to disk survives a crash before the manifest', () => {
 
   rmSync(dir, { recursive: true, force: true });
 });
+
+test('every script that reads the export goes through loadExport', () => {
+  // verify.js once read export.json with loadJson. When entries moved into
+  // per-type files it kept parsing the manifest, found no `entries`, and threw
+  // "Cannot convert undefined or null to object" on a valid export.
+  const dir = path.join(import.meta.dirname, '..');
+  for (const script of ['export.js', 'analyze.js', 'migrate.js', 'verify.js', 'generate.js']) {
+    const src = readFileSync(path.join(dir, script), 'utf8');
+    const readsExport = /loadJson\([^)]*export/i.test(src);
+    assert.equal(readsExport, false, `${script} parses the export itself; use loadExport so split exports work`);
+  }
+});
