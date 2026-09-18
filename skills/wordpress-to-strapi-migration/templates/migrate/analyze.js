@@ -51,7 +51,7 @@ const pascal = (s) => camel(s).replace(/^./, (c) => c.toUpperCase());
 const titleCase = (s) => s.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
 /** Guess a Strapi field for a custom field from the values seen across entries. */
-function infer(key, values, ctx) {
+export function infer(key, values, ctx) {
   let vals = values.filter((v) => !isEmpty(v));
   if (!vals.length) return { skip: 'always empty' };
 
@@ -103,7 +103,15 @@ function infer(key, values, ctx) {
     if (vals.every((v) => /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}/.test(v))) return { type: 'datetime', transform: 'datetime' };
     if (vals.every((v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v))) return { type: 'email', transform: 'raw' };
     if (mediaish && vals.every((v) => /^https?:\/\//.test(v) && ctx.library.find(v))) return { type: 'media', multiple: false, transform: 'media', note: 'uploads URL' };
-    if (vals.some((v) => /<\/?[a-z][^>]*>/i.test(v))) return { type: ctx.richType, transform: 'content', note: 'contains HTML → converted like the body' };
+    if (vals.some((v) => /<\/?[a-z][^>]*>/i.test(v))) {
+      // Markup carrying no prose (an inline <svg> icon, say) has nothing for a
+      // rich-text field to hold: Blocks has no node for it, so converting it
+      // yields an empty field and the value is gone. Keep it as a string.
+      if (vals.every((v) => !htmlToText(v).trim())) {
+        return { type: 'text', transform: 'raw', note: 'markup with no text (SVG or similar) → kept as a string' };
+      }
+      return { type: ctx.richType, transform: 'content', note: 'contains HTML → converted like the body' };
+    }
     return { type: vals.some((v) => v.length > 255 || v.includes('\n')) ? 'text' : 'string', transform: 'raw' };
   }
   // A repeating field Strapi can hold as a repeatable component. Lists of ids were

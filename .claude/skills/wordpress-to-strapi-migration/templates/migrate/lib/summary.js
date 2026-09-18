@@ -31,6 +31,9 @@ const EXPLANATIONS = {
   'image-failed':
     'An image could not be uploaded to Strapi. The entry migrated without it; the reason is on ' +
     'the warning line, and any file Strapi refused outright is listed under "Files that could not be migrated".',
+  'content-emptied':
+    'A field held markup that the target field cannot represent — an inline SVG in a Blocks field, ' +
+    'typically — so it arrived empty. Give that field a plain text type in migration.config.json to keep the markup verbatim.',
   'image-not-embedded': 'An image could not be embedded in Blocks and was left as a link.',
   'file-link-missing': 'A link pointing at an uploaded file could not be resolved.',
   'section-image-dropped': 'An image was dropped from a component because it could not be uploaded, rather than leaving a WordPress URL behind.',
