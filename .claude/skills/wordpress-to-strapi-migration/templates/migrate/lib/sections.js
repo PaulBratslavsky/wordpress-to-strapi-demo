@@ -169,14 +169,25 @@ const stripTags = (html = '') => clean(String(html).replace(/<[^>]+>/g, ' '));
 // Themes ship their own widgets (neuros_heading, av_textblock, …) with their own
 // setting names, so the fallback reads any setting that looks like prose rather
 // than a fixed list. Presentation settings are skipped by name.
+// Only keys that name a video. `link` is not one: a button carries link.url,
+// and treating that as an embed turned every call-to-action into a video.
+const VIDEO_KEYS = ['youtube_url', 'vimeo_url', 'dailymotion_url', 'video_url', 'hosted_url'];
+
 const TEXTY_KEY = /(title|heading|subtitle|text|editor|description|content|caption|excerpt|quote|label|summary)/i;
-const NON_TEXT_KEY = /(color|colour|size|width|height|align|url|link|_id\b|class|type|status|style|margin|padding|icon|image|background|animation|order|position|speed|delay|tag|target|effect)/i;
+const NON_TEXT_KEY =
+  /(color|colour|size|width|height|align|url|link|_id\b|class|type|status|style|margin|padding|icon|image|background|animation|order|position|speed|delay|tag|target|effect|typography|font|weight|spacing|transform|decoration|shadow|border|radius|offset|opacity|zoom|gap|column|row)/i;
+
+// Elementor stores enum settings as bare words. They match no prose test, and a
+// theme that names one `title_typography_typography` used to end up with
+// "custom" appended to its heading.
+const ENUM_VALUE = /^(custom|classic|default|none|yes|no|left|right|center|justify|top|bottom|middle|solid|dashed|dotted|square|circle|rounded|inherit|initial|auto|on|off|true|false|gradient|slide|fade)$/i;
 
 const widgetText = (settings) => {
   const parts = [];
   for (const [key, value] of Object.entries(settings ?? {})) {
     if (typeof value !== 'string' || !value.trim()) continue;
     if (NON_TEXT_KEY.test(key) || !TEXTY_KEY.test(key)) continue;
+    if (ENUM_VALUE.test(value.trim())) continue;
     parts.push(/<[a-z][\s\S]*>/i.test(value) ? value : `<p>${value}</p>`);
   }
   return parts.join('\n');
@@ -218,6 +229,16 @@ function widgetDescriptor(widget, warn) {
         quote: stripTags(s.testimonial_content ?? ''),
         attribution: [s.testimonial_name, s.testimonial_job].filter(Boolean).join(', '),
       };
+    case 'google_maps': {
+      const address = String(s.address ?? '').trim();
+      if (!address) break;
+      return {
+        kind: 'embed',
+        url: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`,
+        provider: 'google-maps',
+        title: address,
+      };
+    }
     case 'video':
       return {
         kind: 'embed',
@@ -226,6 +247,16 @@ function widgetDescriptor(widget, warn) {
         title: '',
       };
     default: {
+      // Themes ship their own video and map widgets (Neuros has
+      // neuros_video_button on 23 pages). Match on what the settings hold
+      // rather than on the widget's name, which is theme-specific.
+      const videoUrl = VIDEO_KEYS.map((k) => (typeof s[k] === 'string' ? s[k] : s[k]?.url)).find(
+        (v) => typeof v === 'string' && /^https?:\/\//.test(v)
+      );
+      if (videoUrl) {
+        return { kind: 'embed', url: videoUrl, provider: providerOf(videoUrl), title: s.button_text ?? s.video_button_text ?? '' };
+      }
+
       const html = widgetText(s);
       if (html) return { kind: 'rich-text', html };
       warn('elementor-widget-skipped', `${widget.widgetType} (no text content)`);

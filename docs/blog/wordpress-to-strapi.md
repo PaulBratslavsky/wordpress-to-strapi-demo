@@ -746,9 +746,13 @@ services each project used. Not every project has every field, because not every
 in WordPress either: two have no hero image, two have no results, and one has no launch date. The
 migration copies what is there rather than inventing the rest.
 
-Neuros: 13 content types, 343 entries and terms, 204 media files, 0 failures, 156 warnings.
-Every count matches the export. Its pages, services and case studies went into dynamic zones and
-produced 913 sections. Northfield's 8 pages produced 23.
+Neuros: 14 content types, 139 entries and terms, 7 menus with 138 items, 172 media files, 0
+failures. Every count matches the export. Its pages, services and case studies went into dynamic
+zones and produced 913 sections, where Northfield's 8 pages produced 23.
+
+It also produced 257 warnings, against Northfield's 19, which is the honest shape of a commercial
+theme: 172 of them are Elementor widgets holding no text of their own, such as carousels and team
+grids, each named and counted so you know what to rebuild.
 
 Two things only showed up because we checked. The SVG refusal described earlier accounted for
 twelve of the flagged pages. The other five were a false alarm: `verify.js` reported five

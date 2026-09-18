@@ -252,17 +252,29 @@ reported rather than silently dropped.
 
 ### Neuros
 
-13 content types generated into a **second** Strapi project on port 1338. Both sites number
+14 content types (13 collections plus the `navigation` single type) generated into a **second**
+Strapi project. Both sites number
 their posts from 1, and entries are matched on `wpId`, so sharing one Strapi would have made
 Neuros post 42 update Northfield post 42. One Strapi per source site avoids that until the
 key is namespaced (P3.1 in the plan).
 
-343 entries and terms created, 204 media files uploaded, **0 failures**, 156 warnings.
+139 entries and terms created (114 post-type entries + 25 terms), plus 7 menus with 138 items,
+172 media files uploaded, **0 failures**.
 
-The site has 389 attachments but only 204 files were uploaded, because the migration uploads
-what the content actually references — featured images, images in bodies, media fields — and
-leaves orphaned uploads behind. If you need the whole library, export with `--download-media`
-and import it separately.
+> An earlier version of this page said "343 entries and terms". That figure was entries + terms +
+> media added together. The counts per type below were right and are unchanged.
+
+The site has 389 attachments but only 172 files were uploaded, because the migration uploads what
+the content actually references — featured images, images in bodies, media fields — and leaves
+orphaned uploads behind. If you need the whole library, export with `--download-media` and import
+it separately.
+
+The media count depends on which lane a type takes. Reading Elementor's rendered HTML (the Blocks
+lane) picks up every `<img>` on the page; reading its stored layout (the dynamic-zone lane, which
+the analyzer now proposes for pages, services and case studies) picks up what the widgets
+reference. The zone lane uploads fewer files and leaves nothing pointing at WordPress: the earlier
+Blocks run left 13 WordPress URLs inside 12 pages, and the zone run leaves none, reporting
+`section-image-dropped` instead.
 
 Every count matches the export:
 
