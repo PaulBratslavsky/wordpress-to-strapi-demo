@@ -346,13 +346,7 @@ builders.
 
 So the skill has two lanes, chosen per content type:
 
-```mermaid
-flowchart TD
-    Body["A WordPress body"] --> Q{"Mostly built with<br/>a page builder?"}
-    Q -->|no| Blocks["Blocks field<br/>(paragraphs, headings, lists, images)"]
-    Q -->|yes| EL["_elementor_data<br/>(the builder's own JSON)"]
-    EL --> Zone["Dynamic zone<br/>of sections.* components"]
-```
+![How a WordPress body lands in Strapi. A body that was not built with a page builder becomes a Blocks field, holding paragraphs, headings and lists in one field. A body that was becomes a dynamic zone, read from the builder's stored layout in _elementor_data, holding separate components: sections.hero, sections.image, sections.rich-text and sections.cta.](images/figures/body-modes.png)
 
 Two Strapi terms there. A **component** is a reusable group of fields stored inside an entry: a
 heading plus an image plus a button, say. A **dynamic zone** is an ordered list of mixed
@@ -469,15 +463,7 @@ migration loses quietly.
 
 Six steps. Five of them are code. One is you.
 
-```mermaid
-flowchart LR
-    A[export] --> B[analyze]
-    B --> C{{review config}}
-    C --> D[generate]
-    D --> E[migrate]
-    E --> F[verify]
-    style C fill:#4b45e0,stroke:#4b45e0,color:#ffffff
-```
+![The six steps in order: export, analyze, review, generate, migrate, verify. Five are run by a script; review is done by you. Under each step is what it leaves behind for the next one, from wp-export/entries to the finished entries and the verify table.](images/figures/pipeline.png)
 
 1. **export** reads your WordPress site through the REST API and writes everything to
    `wp-export/export.json`. From here on nothing touches WordPress, so the site can be slow,
@@ -490,6 +476,8 @@ flowchart LR
 5. **migrate** moves entries, media and relations in two passes. Entries first, then relations,
    because a relation needs its target to exist.
 6. **verify** compares Strapi against the export and tells you what does not match.
+
+![The migration in two passes. In pass one, each WordPress entry is looked up in Strapi by its WordPress id and site: if it is not there it is created, and if it is there it is updated. In pass two, with every entry now existing, the relations are connected.](images/figures/two-passes.png)
 
 Each step writes a file the next one reads, so you can stop anywhere, look at the file, and run
 one step again without repeating the others.
