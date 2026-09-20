@@ -575,11 +575,10 @@ site, including drafts and custom fields.
 
 1. In WP Admin, go to **Users, Profile**.
 2. Scroll down to **Application Passwords**.
-3. Type a name such as `strapi-migration` and click **Add Application Password**.
-4. Copy the password it shows. WordPress will not show it again.
-
+3. Type a name such as `test-strapi-migration` and click **Add Application Password**.
 ![The Application Passwords section of a WordPress user profile, with Users, Profile highlighted in the left menu, a name typed into the New Application Password Name field, and the Add Application Password button below it.](images/011-local-setup-4.png)
-
+4. Copy the password it shows. WordPress will not show it again.
+![WordPress showing the new application password after it is created, with the password itself blacked out here, above a table listing it by name with a Revoke button.](images/011-local-setup-7.1.png)
 
 You will give it to Claude in section 3.
 
@@ -839,54 +838,57 @@ go, and the run reports every widget it skipped with counts, which is the to-do 
 file. `SKILL.md` is what Claude reads, so a house rule like "always use a dynamic zone for
 landing pages" is one sentence.
 
-**Know when this is the wrong tool.** If you are moving tens of thousands of entries, or you need
-a production cutover with a rollback plan, you want purpose-built tooling and a staging rehearsal.
+**Know what changes on a bigger site.** A production cutover needs a rehearsal on a staging copy
+and a way back if it goes wrong, whatever tool you use. Size changes things too, and the next
+section covers what the skill handles for you and what it does not.
 
-### What breaks at 100,000 entries
+### Running it on a big site
 
-The largest site we have run this against held 343 entries and 204 files. Until recently the
-export wrote everything into one `export.json`, and the analyze and migrate steps parsed that
-whole file. On a site with 100,000 posts the file passes what Node can hold in a single string,
-536,870,888 characters on the version we tested, and the run stops before any decision is made.
+The biggest site we have run this against had 343 entries and 204 files. Most of what makes a
+large run painful is already handled, and the rest is worth knowing before you start.
 
-The export now writes one file per post type, `wp-export/entries/<type>.ndjson`, with one entry
-per line, plus a small `export.json` holding the site, types, taxonomies, terms, users and media.
-Nothing is ever one giant string, and because each type's file is complete the moment it is
-written, an interrupted export resumes instead of starting again. Only `--fresh` re-fetches what
-is already on disk.
+**The run picks up where it stopped.** The export writes one file per post type as it goes, so a
+run that dies on type nine keeps the eight it finished. Start it again and it only fetches what is
+missing. `--fresh` re-fetches everything.
 
-Three limits are still real at that size. A whole-site run holds every entry in memory, so 100,000
-posts is bounded by RAM rather than by a parse error. Entries migrate four at a time, each costing
-an API call to look up and another to write, which is hours of wall clock. And relations are wired
-by listing every existing entry of the target type, 100 per request, held in one map.
+**Uploaded files are remembered.** Every upload is recorded in `.migration-state.json`. A second
+run reuses the file already in Strapi instead of sending it again, which matters because images
+take far longer than text.
 
-**What to do instead.** Use the skill for the part it is good at, which is deciding the content
-model, then move the bulk another way:
+**Running it again is safe.** Each entry stores the WordPress id and the site it came from, so a
+second run updates that entry rather than creating a duplicate. This is what makes it reasonable
+to stop half way, change the config, and continue.
 
-- **Rehearse on a slice.** `--only post --limit 500` on a copy gives you a content model, a
-  `migration-plan.md` and a list of what does not convert cleanly. That is the expensive thinking,
-  and it is the same at any size.
-- **Read WordPress from the database, not the REST API.** WP-CLI will page through content without
-  HTTP overhead or authentication: `wp post list --post_type=post --format=json --fields=ID,post_title,post_name,post_date,post_status`.
-  Write one file per type, or per month, so nothing has to be parsed whole.
-- **Write into Strapi from inside Strapi.** The
-  [Document Service API](https://docs.strapi.io/cms/api/document-service) runs in the application
-  rather than over HTTP: `await strapi.documents('api::post.post').create({ data })`. There is no
-  bulk create, so you still loop, but you drop the per-request cost and the token. Run it from a
-  script the project loads, and use Postgres rather than the tutorial's SQLite.
-- **Keep every batch repeatable.** Match entries on their WordPress id and source site, the way
-  the engine does, so a rerun updates instead of duplicating and you can stop and resume per type
-  or per date range.
-- **Move the files separately.** Media is the slow half. Copy the uploads directory and register
-  the files, or point Strapi at the same S3 bucket, instead of downloading and re-uploading each
-  one through the API.
-- **Plan the cutover as two passes.** Migrate the archive while the old site keeps publishing,
-  then catch up on what changed with a date filter, which is what `--since` does here.
+**You can take it in slices.** `--only post,page` does two types. `--limit 200` does the first two
+hundred entries of each. `--since 2026-01-01` does only what changed after a date, which is how
+you catch up on posts published while you were working.
 
-One thing that sounds like a shortcut and is not: `strapi import` and `strapi transfer` only move
-data between Strapi projects whose content types are
-[identical](https://docs.strapi.io/cms/data-management/import). They are useful for pushing a
-finished dataset from a local run to production, and useless for reading WordPress.
+**It refuses to start a run it cannot finish.** The checks before the first write catch a relation
+pointing at a type nobody defined, a component Strapi has not loaded, or a token that cannot
+write. A half-finished migration is worse than one that never began.
+
+Three things to keep in mind as the numbers grow:
+
+- **Memory.** The analyze and migrate steps load every entry of the types they are working on.
+  A single run covering 100,000 posts wants more memory than most laptops have.
+- **Time.** Entries are written four at a time, and each one costs a request to look for it and
+  another to write it. A large run is measured in hours.
+- **Relations.** Before connecting a post to its author, the engine fetches every author already
+  in Strapi, 100 per request.
+
+All three get easier the same way: work one post type at a time, and use `--limit` while you are
+still deciding what the model should be.
+
+**For a genuinely large site, split the job.** Use the skill for the content model, which costs the
+same whether you have 300 entries or 300,000: run it on a few hundred, read `migration-plan.md`,
+and settle what each field becomes. Then, with that model decided, ask Claude to write a loader
+built for your numbers. The pieces are well documented: read WordPress with WP-CLI rather than the
+REST API (`wp post list --post_type=post --format=json`), and write into Strapi from inside the
+application with
+[`strapi.documents('api::post.post').create({ data })`](https://docs.strapi.io/cms/api/document-service),
+which needs no HTTP request and no API token. Keep the two habits the engine uses: store the
+WordPress id on every entry so a re-run updates instead of duplicating, and move the files
+separately from the text.
 
 Everything here is in
 [github.com/PaulBratslavsky/wordpress-to-strapi-demo](https://github.com/PaulBratslavsky/wordpress-to-strapi-demo):
