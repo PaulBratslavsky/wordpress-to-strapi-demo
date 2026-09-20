@@ -844,51 +844,65 @@ section covers what the skill handles for you and what it does not.
 
 ### Running it on a big site
 
-The biggest site we have run this against had 343 entries and 204 files. Most of what makes a
-large run painful is already handled, and the rest is worth knowing before you start.
+The biggest site we have run this against had 343 entries and 204 files. A few hundred to a few
+thousand entries is ordinary. The engine is built so that a long run does not have to be a perfect
+one.
 
-**The run picks up where it stopped.** The export writes one file per post type as it goes, so a
-run that dies on type nine keeps the eight it finished. Start it again and it only fetches what is
-missing. `--fresh` re-fetches everything.
+**You can stop it and start it again.** Three things make that work.
 
-**Uploaded files are remembered.** Every upload is recorded in `.migration-state.json`. A second
-run reuses the file already in Strapi instead of sending it again, which matters because images
-take far longer than text.
+- The export saves each post type to its own file as soon as it has downloaded that type. If it
+  stops after posts and pages, those two files are finished. The next run downloads only the types
+  that are missing. Add `--fresh` to download everything again.
+- Every uploaded image is recorded in `.migration-state.json`. The next run uses the copy already
+  in Strapi instead of uploading it twice. Images are the slow part of any migration, so this is
+  the difference between minutes and an hour.
+- Every entry in Strapi stores the WordPress id it came from, and the site it came from. Run the
+  migration again and it finds that entry and updates it, rather than creating a second copy.
 
-**Running it again is safe.** Each entry stores the WordPress id and the site it came from, so a
-second run updates that entry rather than creating a duplicate. This is what makes it reasonable
-to stop half way, change the config, and continue.
+So you can stop half way, change something in `migration.config.json`, and carry on.
 
-**You can take it in slices.** `--only post,page` does two types. `--limit 200` does the first two
-hundred entries of each. `--since 2026-01-01` does only what changed after a date, which is how
-you catch up on posts published while you were working.
+**You can also do it a piece at a time.**
 
-**It refuses to start a run it cannot finish.** The checks before the first write catch a relation
-pointing at a type nobody defined, a component Strapi has not loaded, or a token that cannot
-write. A half-finished migration is worse than one that never began.
+- `--only post,page` migrates those two types and ignores the rest.
+- `--limit 200` migrates the first two hundred entries of each type.
+- `--since 2026-01-01` migrates only entries that changed after that date. This is how you catch
+  up at the end. Migrate everything on Monday, and on launch day run it again with
+  `--since 2026-01-05` to collect the week's new posts in a couple of minutes.
 
-Three things to keep in mind as the numbers grow:
+**It will not start a run it cannot finish.** Before writing anything it checks that every relation
+points at a type that exists, that Strapi has loaded every component the pages need, and that your
+API token is allowed to write. If any of those fail it stops and tells you which one. A migration
+that dies half way leaves you worse off than one that never started.
 
-- **Memory.** The analyze and migrate steps load every entry of the types they are working on.
-  A single run covering 100,000 posts wants more memory than most laptops have.
-- **Time.** Entries are written four at a time, and each one costs a request to look for it and
-  another to write it. A large run is measured in hours.
-- **Relations.** Before connecting a post to its author, the engine fetches every author already
-  in Strapi, 100 per request.
+**Where it runs out.** Three limits, in the order you meet them.
 
-All three get easier the same way: work one post type at a time, and use `--limit` while you are
-still deciding what the model should be.
+- **Memory.** The analyze and migrate steps hold every entry of the types they are working on.
+  One run covering 100,000 posts needs more memory than most laptops have.
+- **Time.** Entries are written four at a time, and each one costs two requests: one to look for
+  it, one to write it. At that size, plan in hours.
+- **Relations.** Before it can link a post to its author, it fetches every author already in
+  Strapi, 100 at a time.
 
-**For a genuinely large site, split the job.** Use the skill for the content model, which costs the
-same whether you have 300 entries or 300,000: run it on a few hundred, read `migration-plan.md`,
-and settle what each field becomes. Then, with that model decided, ask Claude to write a loader
-built for your numbers. The pieces are well documented: read WordPress with WP-CLI rather than the
-REST API (`wp post list --post_type=post --format=json`), and write into Strapi from inside the
-application with
-[`strapi.documents('api::post.post').create({ data })`](https://docs.strapi.io/cms/api/document-service),
-which needs no HTTP request and no API token. Keep the two habits the engine uses: store the
-WordPress id on every entry so a re-run updates instead of duplicating, and move the files
-separately from the text.
+Working one post type at a time keeps all three manageable. `--limit` keeps each run short while
+you are still deciding what the model should be.
+
+**If your site is much bigger than that, split the job in two.**
+
+The first half is deciding the content model, and it costs the same at any size. Run the skill
+against a few hundred entries, read `migration-plan.md`, and settle what each field becomes. That
+thinking is no different with 300,000 entries than with 300.
+
+The second half is moving the content, and that is where you want something built for your
+numbers. Ask Claude to write it, using the model you just settled. Two pieces do most of the work:
+
+- Read WordPress with WP-CLI instead of the REST API. `wp post list --post_type=post --format=json`
+  reads straight from the database, with no request per page and no application password.
+- Write from inside the Strapi application with
+  [`strapi.documents('api::post.post').create({ data })`](https://docs.strapi.io/cms/api/document-service).
+  It skips HTTP entirely and needs no API token.
+
+Keep the two habits that make this engine's runs repeatable: store the WordPress id on every entry,
+and move the images separately from the text.
 
 Everything here is in
 [github.com/PaulBratslavsky/wordpress-to-strapi-demo](https://github.com/PaulBratslavsky/wordpress-to-strapi-demo):
