@@ -158,7 +158,10 @@ export async function sectionsToZone(sections, ctx) {
         // An image Strapi wouldn't accept (SVG, by default) leaves an empty card
         // behind. Drop the component and say so instead.
         const id = await fileId(s);
-        if (!id) {
+        // `== null` rather than `!id`: a failed upload gives undefined, but a
+        // dry run gives the stand-in id 0, and dropping that reported images as
+        // lost when a real run would have uploaded them.
+        if (id == null) {
           ctx.warn?.('section-image-dropped', s.src || String(s.mediaId ?? ''));
           break;
         }
