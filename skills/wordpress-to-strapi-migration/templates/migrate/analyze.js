@@ -135,6 +135,22 @@ export function infer(key, values, ctx) {
  * page builder means the structure is worth keeping, so those go to a dynamic
  * zone; ordinary prose stays in one Blocks field.
  */
+/**
+ * A key named like a layout setting (`team_member_position`, `hero_align`) is
+ * still content when its values read as words and differ between entries:
+ * "CEO Neuro" and "AI Programmer" are job titles, not a position setting.
+ * Settings hold flags and tokens ("on", "left", "12px"), not phrases.
+ */
+export function isLayoutSetting(key, values) {
+  if (!LAYOUT_KEY.test(key)) return false;
+  const filled = values.filter((v) => !isEmpty(v));
+  const text = filled.map((v) => (typeof v === 'string' ? v.replace(/<[^>]+>/g, ' ').trim() : null));
+  // "on", "left", "full-width", "12px", "#fff": the vocabulary of a setting.
+  const token = (v) => v === null || /^[a-z0-9_#.%-]*$/.test(v);
+  const reads = text.length > 0 && !text.some(token) && text.some((v) => /\s/.test(v));
+  return !(reads && new Set(text).size > 1);
+}
+
 export function proposeBodyMode({ items, builderCount, format }) {
   if (format === 'markdown') return 'markdown';
   return items > 0 && builderCount / items > 0.5 ? 'dynamic-zone' : 'blocks';
@@ -304,7 +320,7 @@ function main() {
 
         // ACF fields are deliberate content; only guess about raw meta.
         if (src !== 'acf') {
-          if (LAYOUT_KEY.test(key)) {
+          if (isLayoutSetting(key, values)) {
             ignored[key] = 'looks like a theme layout/display setting';
             continue;
           }

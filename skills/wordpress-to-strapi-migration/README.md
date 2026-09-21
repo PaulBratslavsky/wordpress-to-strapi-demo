@@ -128,7 +128,7 @@ references/               wordpress-gotchas · page-builders · strapi-content-m
 templates/
 ├── migrate/              the engine (export, analyze, generate, migrate, verify)
 │   ├── lib/              wordpress, strapi, html, blocks, sections, components, media, links …
-│   └── test/             node --test test/*.test.js   (137 tests)
+│   └── test/             node --test test/*.test.js   (152 tests)
 ├── wordpress/            the temporary helper plugin
 └── strapi/               optional public-read bootstrap, headless token script
 ```
@@ -139,7 +139,7 @@ Adding support for a widget or a field type is usually a table entry plus a mapp
 
 ## Limits
 
-Built for sites in the hundreds to low thousands of entries. The largest tested run is 343 entries and 204 files. A whole-site run holds every entry in memory, so six figures needs the streaming work in [the improvement plan](../../docs/skill-improvement-plan.md) or a different approach entirely; the tutorial's [What breaks at 100,000 entries](../../docs/blog/wordpress-to-strapi.md) section covers what to do instead.
+Built for sites in the hundreds to low thousands of entries. The largest tested run is 343 entries and 204 files. A whole-site run holds every entry in memory, so six figures needs the streaming work in [the improvement plan](../../docs/skill-improvement-plan.md) or a different approach entirely; the tutorial's [Running it on a big site](../../docs/blog/wordpress-to-strapi.md#running-it-on-a-big-site) section covers what to do instead.
 
 ---
 
